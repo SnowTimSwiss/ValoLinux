@@ -1,0 +1,11 @@
+[Unit]
+Description=ValoLinux test-image diagnostics
+After=live-config.service
+Before=getty.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/valo-diag
+
+[Install]
+WantedBy=multi-user.target

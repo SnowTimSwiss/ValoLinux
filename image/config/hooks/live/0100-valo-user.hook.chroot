@@ -8,3 +8,6 @@ for g in audio video plugdev netdev sudo nopasswdlogin; do
 done
 id valo >/dev/null 2>&1 || useradd -m -s /bin/bash -G "$groups" valo
 echo 'valo:valo' | chpasswd
+# TEST IMAGE ONLY: root login for debugging. Remove before any real use.
+echo 'root:valo' | chpasswd
+cp /etc/issue /etc/issue.orig
