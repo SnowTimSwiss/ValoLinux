@@ -16,3 +16,8 @@ fonts-noto-core
 firmware-linux
 mesa-vulkan-drivers
 libgl1-mesa-dri
+sudo
+adduser
+live-boot
+live-config
+live-config-systemd

@@ -9,4 +9,4 @@ Ziel: per GitHub Actions bei einem Release eine bootbare ISO bauen, mit **FlameW
 - `config/package-lists/`: Debian-Pakete.
 - `config/includes.chroot/`: Dateien im Image (zram, LightDM-Autologin in FlameWM, Firefox-Policies).
 
-Nicht verifiziert: Pfad/Wirkung von `policies.json`, Session-Name `flamewm` für LightDM, Ecosia-Standardsuche (bewusst noch weggelassen, siehe `docs/verifikation.md`), Live-Benutzername `user`. Das Live-System hat Standard-Rechte von Debian Live (sudo) und ist **kein** gesperrter Kiosk. Das kommt später.
+Nicht verifiziert: Pfad/Wirkung von `policies.json`, Session-Name `flamewm` für LightDM, Ecosia-Standardsuche (bewusst noch weggelassen, siehe `docs/verifikation.md`), Benutzer `valo` (Passwort `valo`, per Hook angelegt). Das Live-System hat Standard-Rechte von Debian Live (sudo) und ist **kein** gesperrter Kiosk. Das kommt später.

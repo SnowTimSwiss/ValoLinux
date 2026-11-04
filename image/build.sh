@@ -19,7 +19,7 @@ lb config \
   --security true --updates true \
   --iso-volume "VALOLINUX" \
   --image-name valolinux \
-  --bootappend-live "boot=live components quiet splash"
+  --bootappend-live "boot=live components live-config.username=valo"
 lb build
 find . -maxdepth 1 -name 'valolinux*.iso' -exec mv {} "$out/" \;
 ls -lh "$out"

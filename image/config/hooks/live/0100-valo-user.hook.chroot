@@ -1,0 +1,10 @@
+#!/bin/sh
+# Create the test user at build time instead of relying on live-config. Login: valo / valo
+set -e
+getent group nopasswdlogin >/dev/null || groupadd -r nopasswdlogin
+groups=""
+for g in audio video plugdev netdev sudo nopasswdlogin; do
+  getent group "$g" >/dev/null && groups="${groups:+$groups,}$g"
+done
+id valo >/dev/null 2>&1 || useradd -m -s /bin/bash -G "$groups" valo
+echo 'valo:valo' | chpasswd
