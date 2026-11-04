@@ -14,3 +14,5 @@ Ergebnisse hier eintragen (Datum, Methode, Resultat). Bis dahin gilt alles als *
 | Debian-Backports-Kernel für N100, Release-Zyklus | offen | |
 | RAUC vs. systemd-sysupdate | offen | |
 | bootc auf Debian als Alternative zum Eigenbau | offen | |
+| Flatpak: Speicher/RAM der Runtimes, eigener signierter Remote, Offline-Verhalten | offen | |
+| Roaming-Home (Nextcloud-Mount vs. Sync) Praxistest | offen | siehe home-und-konten.md |

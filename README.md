@@ -17,6 +17,7 @@ plus eine Verwaltungsschicht (Agent + Web-UI).
 |---|---|
 | `docs/entscheidungen.md` | Getroffene Entscheidungen und Begründungen |
 | `docs/architektur.md` | Architektur, Rollen, Sicherheit |
+| `docs/home-und-konten.md` | Home-Verhalten, zentrale Konten (Entwurf) |
 | `docs/phasen.md` | Phasenplan mit Fortschritt |
 | `docs/verifikation.md` | Unsichere Fakten: was zu prüfen ist, Ergebnisse |
 | `image/` | Image-Build (Phase 1, mkosi/live-build) |

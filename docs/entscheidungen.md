@@ -12,6 +12,8 @@ Stand: 2026-11-04
 | Desktop | FlameWM (X11) | Siehe Verifikation: noch nicht produktionsreif |
 | Browser | Firefox ESR, `policies.json`, Adblocker vorinstalliert, Ecosia (Family-Friendly-Modus) als Standardsuche | Zentrale Steuerung |
 | Office | ArtCraft-Suite, LibreOffice/OnlyOffice als Fallback im Katalog | ArtCraft ist Pre-Alpha |
+| Software-Katalog | **Flatpak als Standard** (eigener, signierter Remote) | Distro-neutral, passt zum Rückweg; Speicher-/RAM-Kosten der Runtimes messen |
+| Home-Verhalten | Löschen beim Abmelden ist **in der Web-UI einstellbar** (pro Rolle/Gruppe/Gerät) | Flexibilität, Default: löschen |
 | Verworfen | Arch, Fedora bootc (vorerst), NixOS (evtl. später), eigene Distro | Pflegeaufwand |
 
 ## Rückweg / Distro-Unabhängigkeit
