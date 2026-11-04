@@ -1,0 +1,24 @@
+# DRAFT, UNTESTED. Builds the ValoLinux image on GitHub Actions (no local build needed).
+# Signing/release steps are intentionally not included yet (Phase 2, key handling needs a decision).
+name: build-image
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * 1"   # weekly, picks up Debian security + Firefox ESR updates
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install mkosi
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pipx debootstrap systemd-container dosfstools mtools squashfs-tools
+          pipx install mkosi
+      - name: Build
+        working-directory: image
+        run: sudo "$(command -v mkosi || echo ~/.local/bin/mkosi)" build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: valolinux-image
+          path: image/*.raw*

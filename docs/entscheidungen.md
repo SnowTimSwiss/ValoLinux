@@ -16,6 +16,10 @@ Stand: 2026-11-04
 | Home-Verhalten | Löschen beim Abmelden ist **in der Web-UI einstellbar** (pro Rolle/Gruppe/Gerät) | Flexibilität, Default: löschen |
 | Verworfen | Arch, Fedora bootc (vorerst), NixOS (evtl. später), eigene Distro | Pflegeaufwand |
 
+## Sprachwahl (Entwurf)
+- **Agent auf dem Gerät: Rust.** Ein einzelnes statisches Binary, keine Laufzeit im Image, und iroh ist selbst Rust.
+- **Server/Web-UI Phase 3: noch offen** (Python/FastAPI schneller, Rust ein Werkzeug für alles). Für den MVP reicht normales HTTPS, iroh wird erst in Phase 4 nötig.
+
 ## Rückweg / Distro-Unabhängigkeit
 Frage aus dem Briefing: „oder würde etwas anderes Sinn machen?"
 
