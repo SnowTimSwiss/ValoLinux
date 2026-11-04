@@ -1,24 +1,42 @@
-# DRAFT, UNTESTED. Builds the ValoLinux image on GitHub Actions (no local build needed).
-# Signing/release steps are intentionally not included yet (Phase 2, key handling needs a decision).
+# DRAFT, UNTESTED. Builds the ValoLinux live ISO only when a GitHub release is published,
+# and attaches it to that release. Can be changed later (schedule, manual) as needed.
 name: build-image
 on:
-  workflow_dispatch:
-  schedule:
-    - cron: "17 3 * * 1"   # weekly, picks up Debian security + Firefox ESR updates
+  release:
+    types: [published]
+permissions:
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-24.04
+    container:
+      image: debian:trixie
+      options: --privileged
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Install mkosi
+      - name: Install tools
         run: |
-          sudo apt-get update
-          sudo apt-get install -y pipx debootstrap systemd-container dosfstools mtools squashfs-tools
-          pipx install mkosi
-      - name: Build
-        working-directory: image
-        run: sudo "$(command -v mkosi || echo ~/.local/bin/mkosi)" build
+          apt-get update
+          apt-get install -y --no-install-recommends git ca-certificates gh live-build debootstrap \
+            squashfs-tools xorriso grub-pc-bin grub-efi-amd64-bin mtools dosfstools syslinux syslinux-common \
+            isolinux curl build-essential pkg-config sudo
+          # Rust only needed for the FlameWM source fallback
+          curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+      - uses: actions/checkout@v4
+      - name: Build ISO
+        run: |
+          . "$HOME/.cargo/env"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          ./image/build.sh "$GITHUB_WORKSPACE/out"
+      - name: Name and checksum
+        run: |
+          cd out
+          mv valolinux*.iso "valolinux-${{ github.event.release.tag_name }}-amd64.iso"
+          sha256sum valolinux-*.iso > SHA256SUMS
       - uses: actions/upload-artifact@v4
         with:
-          name: valolinux-image
-          path: image/*.raw*
+          name: valolinux-iso
+          path: out/*
+      - name: Attach to release
+        run: gh release upload "${{ github.event.release.tag_name }}" out/* --clobber --repo "$GITHUB_REPOSITORY"

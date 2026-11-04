@@ -1,0 +1,18 @@
+# Minimal live system. Recommends are disabled (apt-recommends false).
+firefox-esr
+lightdm
+lightdm-gtk-greeter
+xserver-xorg-core
+xserver-xorg-input-libinput
+xserver-xorg-video-all
+xinit
+dbus-x11
+polkitd
+flatpak
+systemd-zram-generator
+network-manager
+fonts-dejavu-core
+fonts-noto-core
+firmware-linux
+mesa-vulkan-drivers
+libgl1-mesa-dri

@@ -18,7 +18,9 @@ Stand: 2026-11-04
 
 ## Sprachwahl (Entwurf)
 - **Agent auf dem Gerät: Rust.** Ein einzelnes statisches Binary, keine Laufzeit im Image, und iroh ist selbst Rust.
-- **Server/Web-UI Phase 3: noch offen** (Python/FastAPI schneller, Rust ein Werkzeug für alles). Für den MVP reicht normales HTTPS, iroh wird erst in Phase 4 nötig.
+- **Server/Web-UI: Rust** (Entscheidung 2026-11-04), eine Sprache für alles. Für den MVP reicht normales HTTPS, iroh kommt in Phase 4.
+- **Test-Image: Live-ISO mit `live-build`** (nicht mkosi), gebaut in GitHub Actions nur bei Release. A/B-Update-Image bleibt Phase 2.
+- Phase 0 (Messen) wird übersprungen.
 
 ## Rückweg / Distro-Unabhängigkeit
 Frage aus dem Briefing: „oder würde etwas anderes Sinn machen?"
