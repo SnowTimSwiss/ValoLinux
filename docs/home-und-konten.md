@@ -34,6 +34,25 @@ Startpunkt für den Test: **Variante A** (Nextcloud, ist laut Briefing ohnehin g
 - Anmeldung am Gerät gegen den Server, mit lokalem Cache für Offline-Login. Mögliche Anbindung an bestehendes Verzeichnis (Nextcloud/OIDC/LDAP) später.
 - Das ist ein neuer Bestandteil: Konto-Verwaltung und PAM/Login-Integration (z. B. über OIDC oder `sssd`) – Aufwand in Phase 3/4 einplanen, nicht in Phase 1.
 
+## Was der Admin in der Web-UI einstellen kann (Entwurf)
+Alle Einstellungen gelten pro **Rolle**, **Gruppe/Klasse** oder **Gerät**; spezifischer überschreibt allgemeiner.
+
+| Einstellung | Werte |
+|---|---|
+| Home-Modus | `wipe` / `persist-local` / `roaming` |
+| Roaming-Ordner | Liste (z. B. Documents, Desktop) |
+| Quota pro Konto | MB |
+| Anmeldeart am Gerät | Gemeinsames Gerätekonto (ohne Login) / persönliches Konto |
+| Offline-Login erlaubt, Cache-Dauer | ja/nein, Tage |
+| Kontoquelle | Web-UI-intern / später OIDC, LDAP, Nextcloud |
+| Konten anlegen | Einzeln, CSV-Import pro Klasse |
+| Passwort zurücksetzen | Lehrer für eigene Klasse (Recht einstellbar) |
+| Lehrer-Zugriff auf Schülerdateien | aus / nur eigene Klasse / alle |
+| Aufbewahrung/Löschung beim Klassenwechsel/Jahresende | Frist, automatisch löschen oder archivieren |
+| Gerätesperre ausserhalb Unterricht | optional, Zeitplan |
+
+Wichtig: Der Gerätezustand bleibt über das Manifest steuerbar, Konten und Dateien sind davon getrennt.
+
 ## Offene Fragen an dich
 1. Gibt es schon einen Nextcloud-Server/Verzeichnisdienst in der Schule, oder soll die Web-UI die Konten selbst führen?
 2. Datenschutz: Schülerdateien liegen dann zentral – wo wird gehostet (Schulhaus, Gemeinde, extern) und wer darf zustimmen? (Rechtlich nicht von mir geprüft.)
