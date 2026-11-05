@@ -293,6 +293,7 @@ pub fn firefox(p: &mut Platform, s: &Settings) -> Result<Vec<String>, String> {
     // verified yet (docs/verifikation.md), so write both.
     let mut c = p.write("/etc/firefox/policies/policies.json", &text, 0o644)?;
     if p.exists("/usr/lib/firefox-esr") {
+        c |= p.write("/etc/firefox-esr/policies/policies.json", &text, 0o644)?;
         c |= p.write("/usr/lib/firefox-esr/distribution/policies.json", &text, 0o644)?;
     }
     Ok(changed(c, "Richtlinien aktualisiert"))

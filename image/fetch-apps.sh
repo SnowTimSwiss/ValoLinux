@@ -26,4 +26,13 @@ if ! gh release download --repo ArkFlame/FlameWM --pattern 'flamewm_*_amd64.deb'
   ( cd "$tmp/flamewm" && ./scripts/install-deps-ubuntu.sh && ./scripts/build-deb )
   cp "$tmp"/flamewm/.target/dist/flamewm_*_amd64.deb "$dest/"
 fi
+# live-build only picks up *_<arch>.deb / *_all.deb from packages.chroot, so rename
+# e.g. wordcraft-0.15.2-linux-x86_64.deb -> wordcraft_0.15.2_amd64.deb
+for f in "$dest"/*.deb; do
+  pkg=$(dpkg-deb --field "$f" Package)
+  ver=$(dpkg-deb --field "$f" Version)
+  arch=$(dpkg-deb --field "$f" Architecture)
+  want="$dest/${pkg}_${ver}_${arch}.deb"
+  [ "$f" = "$want" ] || mv -f "$f" "$want"
+done
 ls -lh "$dest"

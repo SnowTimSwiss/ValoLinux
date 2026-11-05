@@ -48,6 +48,24 @@ if [ -f "$LB_SHARE/grub-pc/live-theme/theme.txt" ]; then
   sed 's/^title-text:.*/title-text: "ValoLinux"/' "$LB_SHARE/grub-pc/live-theme/theme.txt" \
     > config/bootloaders/grub-pc/live-theme/theme.txt || true
 fi
+# German labels. GRUB (UEFI): own grub.cfg; syslinux (BIOS): relabel the templates.
+cp bootloader/grub.cfg config/bootloaders/grub-pc/grub.cfg || true
+for f in live.cfg.in install_gui.cfg install_text.cfg utilities.cfg menu.cfg; do
+  [ -f "$LB_SHARE/syslinux_common/$f" ] || continue
+  [ -f "config/bootloaders/syslinux_common/$f" ] || cp "$LB_SHARE/syslinux_common/$f" config/bootloaders/syslinux_common/
+  sed -i \
+    -e 's/menu label ^Live system (@FLAVOUR@)$/menu label ValoLinux ^starten/' \
+    -e 's/menu label Live system (@FLAVOUR@ fail-safe mode)$/menu label ValoLinux starten (^abgesicherter Modus)/' \
+    -e 's/menu label Start ^installer$/menu label ValoLinux ^installieren/' \
+    -e 's/menu label Start installer with ^speech synthesis$/menu label Installieren mit ^Sprachausgabe/' \
+    -e 's/menu label ^Advanced install options$/menu label ^Weitere Installationsoptionen/' \
+    -e 's/menu title Advanced install options$/menu title Weitere Installationsoptionen/' \
+    -e 's/menu label ^Utilities$/menu label ^Werkzeuge/' \
+    -e 's/menu title Utilities$/menu title Werkzeuge/' \
+    -e 's/menu label ^Back\.\.$/menu label ^Zurück/' \
+    "config/bootloaders/syslinux_common/$f" || true
+done
+
 SPLASH=config/includes.chroot/usr/share/backgrounds/valolinux-splash.png
 if [ -f "$SPLASH" ]; then
   {
