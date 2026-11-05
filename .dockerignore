@@ -1,5 +1,6 @@
 target
 data
-image
 docs
 .git
+image/**
+!image/config/includes.chroot/usr/share/backgrounds/valolinux.png

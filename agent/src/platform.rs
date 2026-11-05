@@ -27,7 +27,11 @@ impl Platform {
 
     /// Write if the content differs. Returns true if something changed.
     pub fn write(&mut self, p: &str, content: &str, mode: u32) -> Result<bool, String> {
-        if self.read(p).as_deref() == Some(content) {
+        self.write_bytes(p, content.as_bytes(), mode)
+    }
+
+    pub fn write_bytes(&mut self, p: &str, content: &[u8], mode: u32) -> Result<bool, String> {
+        if std::fs::read(self.path(p)).ok().as_deref() == Some(content) {
             return Ok(false);
         }
         let full = self.path(p);

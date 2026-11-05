@@ -47,6 +47,15 @@ pub fn routes() -> Router<Shared> {
         .route("/settings/{scope}", get(settings_page).post(settings_submit))
         .route("/apps", get(apps_page).post(app_create))
         .route("/apps/{id}/delete", post(app_delete))
+        .route(
+            "/wallpapers",
+            get(wallpapers_page)
+                .post(wallpaper_upload)
+                .layer(axum::extract::DefaultBodyLimit::max(MAX_UPLOAD + 64 * 1024)),
+        )
+        .route("/wallpapers/{sha}/delete", post(wallpaper_delete))
+        .route("/assets/{sha}", get(asset))
+        .route("/static/default-wallpaper.png", get(default_wallpaper))
 }
 
 // ---------------------------------------------------------------------------
@@ -155,6 +164,7 @@ fn layout(s: &Shared, admin: &Admin, active: &str, title: &str, q: &HashMap<Stri
         ("/groups", "Gruppen", "◫"),
         ("/settings", "Einstellungen", "⚙"),
         ("/apps", "App-Katalog", "▦"),
+        ("/wallpapers", "Hintergründe", "◪"),
     ];
     html! {
         (head(title))
@@ -920,7 +930,16 @@ fn inherited(s: &Shared, scope: &Scope) -> Result<(Settings, &'static str), Resp
     })
 }
 
-fn field_input(f: &Field, current: Option<&Value>, parent: Option<&Value>, from: &str, catalog: &[CatalogEntry]) -> Markup {
+type Assets = [(String, String, String)];
+
+fn field_input(
+    f: &Field,
+    current: Option<&Value>,
+    parent: Option<&Value>,
+    from: &str,
+    catalog: &[CatalogEntry],
+    assets: &Assets,
+) -> Markup {
     let parent_txt = fields::display(f, parent, catalog);
     let cur_str = current.and_then(|v| v.as_str()).unwrap_or("");
     html! {
@@ -954,6 +973,27 @@ fn field_input(f: &Field, current: Option<&Value>, parent: Option<&Value>, from:
                             label { input type="radio" name=(f.key) value="false" checked[b == Some(false)]; span { "Nein" } }
                         }
                     }
+                    Kind::Wallpaper => {
+                        div.wallgrid {
+                            label.wallcard {
+                                input type="radio" name=(f.key) value="" checked[current.is_none()];
+                                span.wallthumb.inherit { "Erben" }
+                                span.small { (from) ": " (parent_txt) }
+                            }
+                            label.wallcard {
+                                input type="radio" name=(f.key) value="default" checked[cur_str == "default"];
+                                img.wallthumb src="/static/default-wallpaper.png" alt="" loading="lazy";
+                                span.small { "ValoLinux" }
+                            }
+                            @for (sha, name, _) in assets {
+                                label.wallcard {
+                                    input type="radio" name=(f.key) value=(sha) checked[cur_str == sha.as_str()];
+                                    img.wallthumb src={"/assets/" (sha)} alt="" loading="lazy";
+                                    span.small { (name) }
+                                }
+                            }
+                        }
+                    }
                     Kind::Apps => {
                         @let selected: Vec<&str> = current.and_then(|v| v.as_array()).map(|a| a.iter().filter_map(|x| x.as_str()).collect()).unwrap_or_default();
                         @let parent_sel: Vec<&str> = parent.and_then(|v| v.as_array()).map(|a| a.iter().filter_map(|x| x.as_str()).collect()).unwrap_or_default();
@@ -984,6 +1024,7 @@ async fn settings_page(State(s): State<Shared>, admin: Admin, Path(scope_s): Pat
     let groups = s.db.groups().map_err(e500)?;
     let catalog = s.db.catalog().map_err(e500)?;
     let current = fields::to_map(&s.db.policy(&scope.key()).map_err(e500)?);
+    let assets = s.db.assets().map_err(e500)?;
     let (parent, from) = inherited(&s, &scope)?;
     let parent = fields::to_map(&parent);
     let title = match &scope {
@@ -1022,7 +1063,7 @@ async fn settings_page(State(s): State<Shared>, admin: Admin, Path(scope_s): Pat
                 section.card {
                     h2 { span.sec-icon { (sec.icon) } (sec.title) }
                     @for f in sec.fields {
-                        (field_input(f, current.get(f.key), parent.get(f.key), from, &catalog))
+                        (field_input(f, current.get(f.key), parent.get(f.key), from, &catalog, &assets))
                     }
                 }
             }
@@ -1283,6 +1324,116 @@ async fn admin_delete(State(s): State<Shared>, admin: Admin, Path(id): Path<i64>
     }
     s.db.delete_admin(id).map_err(e500)?;
     Ok(redirect_msg("/account", "Admin gelöscht."))
+}
+
+// ---------------------------------------------------------------------------
+// wallpapers
+// ---------------------------------------------------------------------------
+
+const MAX_UPLOAD: usize = 15 * 1024 * 1024;
+
+async fn default_wallpaper() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, "image/png"), (header::CACHE_CONTROL, "public, max-age=86400")],
+        &include_bytes!("../../image/config/includes.chroot/usr/share/backgrounds/valolinux.png")[..],
+    )
+}
+
+/// Uploaded files are public on purpose: devices fetch them without a session.
+/// The signed manifest carries the sha256, so devices verify what they download.
+async fn asset(State(s): State<Shared>, Path(sha): Path<String>) -> Response {
+    if !valo_proto::is_sha256(&sha) {
+        return not_found();
+    }
+    let Ok(Some(kind)) = s.db.asset_kind(&sha) else { return not_found() };
+    match tokio::fs::read(s.assets_dir.join(&sha)).await {
+        Ok(data) => (
+            [
+                (header::CONTENT_TYPE, if kind == "png" { "image/png" } else { "image/jpeg" }),
+                (header::CACHE_CONTROL, "public, max-age=31536000, immutable"),
+            ],
+            data,
+        )
+            .into_response(),
+        Err(_) => not_found(),
+    }
+}
+
+async fn wallpapers_page(State(s): State<Shared>, admin: Admin, Query(q): Q) -> Page {
+    let assets = s.db.assets().map_err(e500)?;
+    let body = html! {
+        p.muted { "Lade eigene Hintergrundbilder hoch (PNG oder JPEG, ideal 1920×1080, max. 15 MB). "
+            "Welches Bild ein Gerät bekommt, wählst du unter " a href="/settings" { "Einstellungen → Desktop" } "." }
+        div.tiles {
+            div.tile.fixed {
+                img.wallthumb.big src="/static/default-wallpaper.png" alt="";
+                h3 { "ValoLinux" } p.muted.small { "Standard, im Image enthalten" }
+            }
+            @for (sha, name, _) in &assets {
+                div.tile {
+                    img.wallthumb.big src={"/assets/" (sha)} alt="";
+                    h3 { (name) }
+                    div.tile-actions {
+                        form method="post" action={"/wallpapers/" (sha) "/delete"}
+                            onsubmit="return confirm('Bild löschen? Geräte, die es verwenden, behalten es bis zur nächsten Änderung.')" {
+                            (csrf(&admin)) button.link.danger-text type="submit" { "Löschen" }
+                        }
+                    }
+                }
+            }
+            form.tile.new method="post" action="/wallpapers" enctype="multipart/form-data" {
+                (csrf(&admin))
+                h3 { "Bild hochladen" }
+                input type="text" name="name" placeholder="Name, z. B. Schulhaus" maxlength="60";
+                input type="file" name="file" accept="image/png,image/jpeg" required;
+                button.primary type="submit" { "Hochladen" }
+            }
+        }
+    };
+    Ok(layout(&s, &admin, "/wallpapers", "Hintergründe", &q, body))
+}
+
+async fn wallpaper_upload(State(s): State<Shared>, admin: Admin, mut mp: axum::extract::Multipart) -> Page {
+    let (mut csrf_ok, mut name, mut data) = (false, String::new(), None::<Vec<u8>>);
+    while let Ok(Some(field)) = mp.next_field().await {
+        match field.name().unwrap_or("") {
+            "csrf" => csrf_ok = field.text().await.ok().as_deref() == Some(admin.csrf.as_str()),
+            "name" => name = field.text().await.unwrap_or_default().trim().chars().take(60).collect(),
+            "file" => {
+                let fname = field.file_name().unwrap_or("").to_string();
+                let bytes = field.bytes().await.map_err(|_| redirect_err("/wallpapers", "Upload abgebrochen oder zu gross (max. 15 MB)."))?;
+                if name.is_empty() {
+                    name = fname.rsplit_once('.').map(|(n, _)| n).unwrap_or(&fname).chars().take(60).collect();
+                }
+                data = Some(bytes.to_vec());
+            }
+            _ => {}
+        }
+    }
+    if !csrf_ok {
+        return Err((StatusCode::FORBIDDEN, "Ungültiges Formular (CSRF). Bitte Seite neu laden.").into_response());
+    }
+    let Some(data) = data.filter(|d| !d.is_empty() && d.len() <= MAX_UPLOAD) else {
+        return Ok(redirect_err("/wallpapers", "Keine Datei oder Datei zu gross."));
+    };
+    let Some(kind) = valo_proto::image_kind(&data) else {
+        return Ok(redirect_err("/wallpapers", "Nur PNG- oder JPEG-Bilder."));
+    };
+    let sha = valo_proto::sha256_hex(&data);
+    tokio::fs::write(s.assets_dir.join(&sha), &data).await.map_err(e500)?;
+    let name = if name.is_empty() { "Bild".to_string() } else { name };
+    s.db.add_asset(&sha, &name, kind, data.len() as i64).map_err(e500)?;
+    Ok(redirect_msg("/wallpapers", "Bild hochgeladen. Jetzt unter Einstellungen → Desktop auswählen."))
+}
+
+async fn wallpaper_delete(State(s): State<Shared>, admin: Admin, Path(sha): Path<String>, body: String) -> Page {
+    admin.check_csrf(&FormData::parse(&body))?;
+    if !valo_proto::is_sha256(&sha) {
+        return Err(not_found());
+    }
+    s.db.delete_asset(&sha).map_err(e500)?;
+    let _ = tokio::fs::remove_file(s.assets_dir.join(&sha)).await;
+    Ok(redirect_msg("/wallpapers", "Bild gelöscht."))
 }
 
 #[cfg(test)]

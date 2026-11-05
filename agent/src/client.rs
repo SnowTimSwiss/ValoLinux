@@ -43,6 +43,15 @@ impl<'a> Client<'a> {
         Ok(Response { status, body })
     }
 
+    /// Plain GET returning bytes (public files like wallpapers), max 20 MB.
+    pub fn get_bytes(&self, path: &str) -> Result<Vec<u8>, String> {
+        let mut r = self.http.get(format!("{}{path}", self.base)).call().map_err(|e| e.to_string())?;
+        if r.status().as_u16() != 200 {
+            return Err(format!("{path}: HTTP {}", r.status().as_u16()));
+        }
+        r.body_mut().with_config().limit(20 * 1024 * 1024).read_to_vec().map_err(|e| e.to_string())
+    }
+
     pub fn post_json<T: serde::Serialize>(&self, path: &str, value: &T) -> Result<Response, String> {
         let body = serde_json::to_vec(value).map_err(|e| e.to_string())?;
         let (t, sig) = self.signature("POST", path, &body);

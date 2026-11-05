@@ -11,6 +11,7 @@ pub enum Kind {
     Lines { placeholder: &'static str },
     Bool,
     Apps,
+    Wallpaper,
 }
 
 pub struct Field {
@@ -121,6 +122,16 @@ pub static SECTIONS: &[Section] = &[
         ],
     },
     Section {
+        title: "Desktop",
+        icon: "🖼",
+        fields: &[Field {
+            key: "wallpaper",
+            label: "Hintergrundbild",
+            help: "Eigene Bilder unter „Hintergründe“ hochladen. Gilt ab der nächsten Anmeldung.",
+            kind: Kind::Wallpaper,
+        }],
+    },
+    Section {
         title: "Apps",
         icon: "▦",
         fields: &[Field {
@@ -189,6 +200,8 @@ pub fn display(field: &Field, v: Option<&Value>, catalog: &[crate::db::CatalogEn
             .map(|id| catalog.iter().find(|c| c.app.id == id).map(|c| c.app.name.clone()).unwrap_or(id.into()))
             .collect::<Vec<_>>()
             .join(", "),
+        (Kind::Wallpaper, Value::String(s)) if s == "default" => "ValoLinux (Standard)".into(),
+        (Kind::Wallpaper, Value::String(s)) => format!("eigenes Bild {}", &s[..s.len().min(8)]),
         (_, Value::String(s)) => s.clone(),
         (_, other) => other.to_string(),
     }
@@ -202,6 +215,7 @@ pub fn parse_form(form: &crate::util::FormData, catalog: &[crate::db::CatalogEnt
         let value = match &f.kind {
             Kind::Choice(opts) => opts.iter().any(|(k, _)| *k == v).then(|| Value::String(v.clone())),
             Kind::Text { .. } => (!v.is_empty()).then(|| Value::String(v.chars().take(500).collect())),
+            Kind::Wallpaper => (v == "default" || valo_proto::is_sha256(&v)).then(|| Value::String(v.clone())),
             Kind::Lines { .. } => {
                 let lines: Vec<Value> = v
                     .lines()

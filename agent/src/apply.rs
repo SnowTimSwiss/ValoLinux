@@ -49,7 +49,15 @@ pub fn run_action(p: &mut Platform, a: &valo_proto::Action) -> Result<(), String
     }
 }
 
+/// Files the agent fetched for this manifest (e.g. wallpaper by sha256).
+pub type Downloads = std::collections::HashMap<String, Vec<u8>>;
+
+#[cfg(test)]
 pub fn apply(p: &mut Platform, m: &Manifest, state: &mut Applied) -> Outcome {
+    apply_with(p, m, state, &Downloads::new())
+}
+
+pub fn apply_with(p: &mut Platform, m: &Manifest, state: &mut Applied, files: &Downloads) -> Outcome {
     let s = &m.settings;
     let mut messages = vec![];
     let mut ok = true;
@@ -70,6 +78,7 @@ pub fn apply(p: &mut Platform, m: &Manifest, state: &mut Applied) -> Outcome {
     step("Firefox", firefox(p, s));
     step("Rechte", permissions(p, m));
     step("Home", home(p, s));
+    step("Hintergrund", wallpaper(p, s, files));
     step("Admin-Konto", admin_account(p, m, state));
     step("Apps", apps(p, m, state));
     step("Identität", identity(p, m));
@@ -315,6 +324,28 @@ pub fn home(p: &mut Platform, s: &Settings) -> Result<Vec<String>, String> {
     Ok(changed(c, if mode == "wipe" { "beim Abmelden löschen" } else { "behalten" }))
 }
 
+pub const DEFAULT_WALLPAPER: &str = "/usr/share/backgrounds/valolinux.png";
+
+/// Desktop wallpaper for new sessions (FlameWM settings in /etc/skel; the
+/// kiosk home is recreated from skel at logout when home mode is "wipe").
+pub fn wallpaper(p: &mut Platform, s: &Settings, files: &Downloads) -> Result<Vec<String>, String> {
+    let choice = s.wallpaper.clone().unwrap_or_else(|| "default".into());
+    let path = if valo_proto::is_sha256(&choice) {
+        let data = files.get(&choice).ok_or("Bild noch nicht heruntergeladen")?;
+        if valo_proto::sha256_hex(data) != choice {
+            return Err("Prüfsumme des Bildes stimmt nicht".into());
+        }
+        let ext = valo_proto::image_kind(data).ok_or("kein PNG/JPEG")?;
+        let path = format!("/usr/share/backgrounds/valolinux-custom-{}.{ext}", &choice[..16]);
+        p.write_bytes(&path, data, 0o644)?;
+        path
+    } else {
+        DEFAULT_WALLPAPER.to_string()
+    };
+    let c = p.write("/etc/skel/.config/flamewm/settings.toml", &format!("wallpaper={path}\n"), 0o644)?;
+    Ok(changed(c, if path == DEFAULT_WALLPAPER { "Standardbild" } else { "eigenes Bild" }))
+}
+
 pub fn admin_account(p: &mut Platform, m: &Manifest, state: &mut Applied) -> Result<Vec<String>, String> {
     let Some(hash) = &m.admin_password_hash else { return Ok(vec![]) };
     if !hash.starts_with("$6$") || hash.contains(['\n', ':', ' ']) {
@@ -484,6 +515,28 @@ mod tests {
         run_action(&mut p, &m.actions[0]).unwrap();
         assert_eq!(p.log.last().unwrap(), "run systemctl reboot");
         assert!(run_action(&mut p, &valo_proto::Action { id: 8, kind: "format".into() }).is_err());
+    }
+
+    #[test]
+    fn wallpaper_checks_hash() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut p = Platform::new(dir.path(), true);
+        let img = b"\x89PNG\r\n\x1a\nrest-of-image".to_vec();
+        let sha = valo_proto::sha256_hex(&img);
+        let s = Settings::resolve([&Settings { wallpaper: Some(sha.clone()), ..Default::default() }]);
+        let mut files = Downloads::new();
+        assert!(wallpaper(&mut p, &s, &files).is_err(), "missing download");
+        files.insert(sha.clone(), b"\x89PNG\r\n\x1a\ntampered".to_vec());
+        assert!(wallpaper(&mut p, &s, &files).is_err(), "hash mismatch");
+        files.insert(sha.clone(), img.clone());
+        wallpaper(&mut p, &s, &files).unwrap();
+        let skel = std::fs::read_to_string(dir.path().join("etc/skel/.config/flamewm/settings.toml")).unwrap();
+        let target = format!("/usr/share/backgrounds/valolinux-custom-{}.png", &sha[..16]);
+        assert_eq!(skel, format!("wallpaper={target}\n"));
+        assert_eq!(std::fs::read(dir.path().join(target.trim_start_matches('/'))).unwrap(), img);
+        wallpaper(&mut p, &Settings::defaults(), &files).unwrap();
+        let skel = std::fs::read_to_string(dir.path().join("etc/skel/.config/flamewm/settings.toml")).unwrap();
+        assert_eq!(skel, format!("wallpaper={DEFAULT_WALLPAPER}\n"));
     }
 
     #[test]

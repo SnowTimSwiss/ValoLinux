@@ -22,6 +22,8 @@ pub struct AppState {
     pub secure_cookies: bool,
     /// Failed logins per username: (count, window start). In memory on purpose.
     pub failed_logins: std::sync::Mutex<std::collections::HashMap<String, (u32, i64)>>,
+    /// Uploaded files (wallpapers), named by sha256.
+    pub assets_dir: PathBuf,
 }
 
 pub type Shared = Arc<AppState>;
@@ -105,7 +107,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     restrict_data_dir(&data_dir);
     tracing::info!("server public key: {}", key.public_key());
 
-    let state = Arc::new(AppState { db, key, secure_cookies, failed_logins: Default::default() });
+    let assets_dir = data_dir.join("assets");
+    std::fs::create_dir_all(&assets_dir)?;
+    let state = Arc::new(AppState { db, key, secure_cookies, failed_logins: Default::default(), assets_dir });
     let listener = tokio::net::TcpListener::bind(&listen).await?;
     tracing::info!("listening on http://{listen}");
     axum::serve(listener, app(state)).await?;

@@ -36,6 +36,7 @@ Umgebungsvariablen: `VALO_DATA_DIR` (Standard `./data`), `VALO_LISTEN` (`0.0.0.0
 ## Geräte verwalten
 - **Mehrere Geräte zuweisen:** In der Geräteliste Häkchen setzen, unten Rolle und/oder Gruppe wählen, „Übernehmen“.
 - **Fernaktionen:** Gerät → Aktionen: *Neu starten*, *Ausschalten*. In der Gruppenübersicht für alle Geräte einer Gruppe. Das Gerät führt die Aktion beim nächsten Abgleich aus (Agent fragt jede Minute), danach steht sie als „ausgeführt“ in der Liste. Ausgeschaltete Geräte holen wartende Aktionen beim nächsten Start nach, wartende Aktionen lassen sich abbrechen.
+- **Hintergrundbilder:** Unter „Hintergründe“ PNG/JPEG hochladen, dann unter Einstellungen → Desktop pro Ebene auswählen. Das Gerät lädt das Bild, prüft die Prüfsumme aus dem signierten Manifest und setzt es für neue Sitzungen (über `/etc/skel`; mit Home-Modus „Löschen“ ab der nächsten Anmeldung). Bilder sind ohne Anmeldung abrufbar (`/assets/<sha256>`), damit Geräte sie laden können: keine vertraulichen Bilder hochladen.
 - **Admin-Passwort pro Gerät:** Gerät → Lokales Admin-Konto → Passwort anzeigen / neu erzeugen.
 
 ## Einstellungen
@@ -51,6 +52,7 @@ Ebenen, die spätere gewinnt: **Standard → Global → Rolle → Gruppe → Ger
 | Apps | Flatpak von Flathub, nur aus dem Katalog; der Agent entfernt nur, was er selbst installiert hat |
 | Rechte | `/etc/valolinux/permissions.json`, polkit-Regel für Flatpak |
 | Admin-Konto | Benutzer `valoadmin`, Passwort pro Gerät zufällig (Web-UI: Gerät → Passwort anzeigen) |
+| Hintergrundbild | `/usr/share/backgrounds/valolinux-custom-*.png/jpg`, `/etc/skel/.config/flamewm/settings.toml` |
 | Name | Hostname |
 
 ## Agent
@@ -90,3 +92,4 @@ Der Server-Test spielt den ganzen Ablauf durch (Setup, Login, Anmeldung, Adoptio
 ![Fernaktionen](img/ui/15-device-actions.png)
 ![Gruppen](img/ui/16-groups.png)
 ![Browser: Lesezeichen und Webfilter](img/ui/18-browser-settings.png)
+![Hintergründe](img/ui/19-wallpapers.png)

@@ -58,6 +58,13 @@ CREATE TABLE IF NOT EXISTS actions (
     created INTEGER NOT NULL,
     done INTEGER
 );
+CREATE TABLE IF NOT EXISTS assets (
+    sha256 TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    created INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS policies (
     scope TEXT PRIMARY KEY,
     json TEXT NOT NULL
@@ -568,6 +575,32 @@ impl Db {
         }
         scopes.push(format!("device:{}", d.id));
         scopes.into_iter().map(|s| Ok((s.clone(), self.policy(&s)?))).collect()
+    }
+
+    // ----- assets (wallpapers) ------------------------------------------------
+
+    pub fn add_asset(&self, sha: &str, name: &str, kind: &str, size: i64) -> Result<()> {
+        self.c().execute(
+            "INSERT OR IGNORE INTO assets (sha256, name, kind, size, created) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![sha, name, kind, size, now_unix()],
+        )?;
+        Ok(())
+    }
+
+    /// (sha256, name, kind)
+    pub fn assets(&self) -> Result<Vec<(String, String, String)>> {
+        let c = self.c();
+        let mut st = c.prepare("SELECT sha256, name, kind FROM assets ORDER BY created")?;
+        st.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?.collect()
+    }
+
+    pub fn asset_kind(&self, sha: &str) -> Result<Option<String>> {
+        self.c().query_row("SELECT kind FROM assets WHERE sha256 = ?1", [sha], |r| r.get(0)).optional()
+    }
+
+    pub fn delete_asset(&self, sha: &str) -> Result<()> {
+        self.c().execute("DELETE FROM assets WHERE sha256 = ?1", [sha])?;
+        Ok(())
     }
 
     // ----- catalog -----------------------------------------------------------

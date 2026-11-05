@@ -6,6 +6,8 @@ COPY Cargo.toml Cargo.lock ./
 COPY crates crates
 COPY server server
 COPY agent agent
+# default wallpaper is embedded in the server (shown in the web UI)
+COPY image/config/includes.chroot/usr/share/backgrounds/valolinux.png image/config/includes.chroot/usr/share/backgrounds/valolinux.png
 RUN cargo build --release --locked -p valo-server
 
 FROM debian:trixie-slim

@@ -63,6 +63,9 @@ pub struct Settings {
     /// May users install Firefox add-ons themselves?
     #[serde(skip_serializing_if = "Option::is_none")]
     pub browser_allow_addons: Option<bool>,
+    /// Desktop wallpaper: "default" or the sha256 of an uploaded image.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub wallpaper: Option<String>,
     /// Catalog app ids to install.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub apps: Option<Vec<String>>,
@@ -95,6 +98,7 @@ impl Settings {
             browser_filter: Some("off".into()),
             browser_sites: Some(vec![]),
             browser_allow_addons: Some(false),
+            wallpaper: Some("default".into()),
             apps: Some(vec![]),
             allow_app_install: Some(false),
             allow_user_settings: Some(false),
@@ -120,6 +124,7 @@ impl Settings {
             browser_filter,
             browser_sites,
             browser_allow_addons,
+            wallpaper,
             apps,
             allow_app_install,
             allow_user_settings,
@@ -322,6 +327,26 @@ impl SignedManifest {
     pub fn open(&self, server_key: &str) -> Result<Manifest, KeyError> {
         verify(server_key, self.payload.as_bytes(), &self.signature)?;
         serde_json::from_str(&self.payload).map_err(|e| KeyError(format!("manifest json: {e}")))
+    }
+}
+
+/// True for a lowercase hex sha256 (64 chars).
+pub fn is_sha256(s: &str) -> bool {
+    s.len() == 64 && s.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+}
+
+pub fn sha256_hex(data: &[u8]) -> String {
+    hex(&Sha256::digest(data))
+}
+
+/// "png" / "jpg" from the file header, None for anything else.
+pub fn image_kind(data: &[u8]) -> Option<&'static str> {
+    if data.starts_with(b"\x89PNG\r\n\x1a\n") {
+        Some("png")
+    } else if data.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        Some("jpg")
+    } else {
+        None
     }
 }
 

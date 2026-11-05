@@ -14,6 +14,7 @@ fn state() -> crate::Shared {
         key: Identity::generate().unwrap(),
         secure_cookies: false,
         failed_logins: Default::default(),
+        assets_dir: tempfile::tempdir().unwrap().keep(),
     })
 }
 
@@ -448,4 +449,60 @@ async fn line_settings_parse() {
     assert_eq!(p.browser_bookmarks, None, "empty textarea inherits");
     let (_, _, page) = send(&s, get("/settings/role:student", &cookie)).await;
     assert!(page.contains("schule.ch\nedu.ch"));
+}
+
+#[tokio::test]
+async fn wallpaper_upload_and_manifest() {
+    let s = state();
+    let (cookie, csrf) = login(&s).await;
+    let img = b"\x89PNG\r\n\x1a\nfake-but-valid-header".to_vec();
+    let boundary = "XyZ";
+    let mut body = Vec::new();
+    for (name, val) in [("csrf", csrf.as_str()), ("name", "Schulhaus")] {
+        body.extend(format!("--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n{val}\r\n").as_bytes());
+    }
+    body.extend(format!("--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"a.png\"\r\nContent-Type: image/png\r\n\r\n").as_bytes());
+    body.extend(&img);
+    body.extend(format!("\r\n--{boundary}--\r\n").as_bytes());
+    let req = Request::builder()
+        .method("POST")
+        .uri("/wallpapers")
+        .header(header::COOKIE, &cookie)
+        .header(header::CONTENT_TYPE, format!("multipart/form-data; boundary={boundary}"))
+        .body(Body::from(body))
+        .unwrap();
+    let (st, h, _) = send(&s, req).await;
+    assert_eq!(st, StatusCode::SEE_OTHER);
+    assert!(h.iter().any(|(k, v)| k == "location" && v.contains("msg=")), "{h:?}");
+    let sha = valo_proto::sha256_hex(&img);
+    assert_eq!(s.db.assets().unwrap()[0].0, sha);
+
+    // served publicly with the exact bytes
+    let req = Request::builder().uri(format!("/assets/{sha}")).body(Body::empty()).unwrap();
+    let resp = app(s.clone()).oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(resp.into_body().collect().await.unwrap().to_bytes().to_vec(), img);
+
+    // select it globally; invalid values are ignored
+    send(&s, form("/settings/global", &cookie, &format!("csrf={csrf}&wallpaper={sha}&apps_mode=inherit"))).await;
+    assert_eq!(s.db.policy("global").unwrap().wallpaper.as_deref(), Some(sha.as_str()));
+    send(&s, form("/settings/global", &cookie, &format!("csrf={csrf}&wallpaper=..%2F..%2Fetc&apps_mode=inherit"))).await;
+    assert_eq!(s.db.policy("global").unwrap().wallpaper, None);
+
+    // not an image
+    let mut bad = format!("--{boundary}\r\nContent-Disposition: form-data; name=\"csrf\"\r\n\r\n{csrf}\r\n").into_bytes();
+    bad.extend(format!("--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"x.sh\"\r\n\r\n#!/bin/sh\r\n--{boundary}--\r\n").as_bytes());
+    let req = Request::builder()
+        .method("POST")
+        .uri("/wallpapers")
+        .header(header::COOKIE, &cookie)
+        .header(header::CONTENT_TYPE, format!("multipart/form-data; boundary={boundary}"))
+        .body(Body::from(bad))
+        .unwrap();
+    let (_, h, _) = send(&s, req).await;
+    assert!(h.iter().any(|(k, v)| k == "location" && v.contains("err=")));
+    assert_eq!(s.db.assets().unwrap().len(), 1);
+    for page in ["/wallpapers", "/settings/global"] {
+        assert_eq!(send(&s, get(page, &cookie)).await.0, StatusCode::OK);
+    }
 }

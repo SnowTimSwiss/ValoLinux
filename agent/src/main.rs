@@ -237,6 +237,25 @@ impl Agent {
         };
     }
 
+    /// Fetch files the manifest refers to; cached in the state dir by sha256
+    /// so offline starts still work. Integrity is checked in apply (hash from the signed manifest).
+    fn downloads(&self, m: &valo_proto::Manifest, c: Option<&client::Client>) -> apply::Downloads {
+        let mut out = apply::Downloads::new();
+        let Some(sha) = m.settings.wallpaper.as_deref().filter(|w| valo_proto::is_sha256(w)) else { return out };
+        let cache = self.state_dir.join(format!("asset-{sha}"));
+        let data = std::fs::read(&cache).ok().filter(|d| valo_proto::sha256_hex(d) == sha).or_else(|| {
+            let d = c?.get_bytes(&format!("/assets/{sha}")).map_err(|e| eprintln!("download: {e}")).ok()?;
+            (valo_proto::sha256_hex(&d) == sha).then(|| {
+                let _ = std::fs::write(&cache, &d);
+                d
+            })
+        });
+        if let Some(d) = data {
+            out.insert(sha.to_string(), d);
+        }
+        out
+    }
+
     fn applied(&self) -> apply::Applied {
         read_json(&self.state_dir.join("applied.json")).unwrap_or_default()
     }
@@ -246,7 +265,7 @@ impl Agent {
         let mut state = self.applied();
         let mut p = self.platform();
         let out = if configure {
-            apply::apply(&mut p, m, &mut state)
+            apply::apply_with(&mut p, m, &mut state, &self.downloads(m, c))
         } else {
             apply::Outcome { ok: state.ok, messages: vec![] }
         };
