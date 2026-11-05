@@ -1,0 +1,19 @@
+# Start:  docker compose -f server/docker-compose.yml up -d --build   (from the repository root)
+# Then open http://<server>:8080 and create the first admin account.
+# Do not expose this port to the internet. Put a TLS reverse proxy in front for HTTPS
+# and set VALO_SECURE_COOKIES=1.
+services:
+  valolinux:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    image: valolinux-server
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - valo-data:/data
+    environment:
+      VALO_SECURE_COOKIES: "0"
+volumes:
+  valo-data:

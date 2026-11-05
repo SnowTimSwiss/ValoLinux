@@ -1,0 +1,13 @@
+[Unit]
+Description=ValoLinux device agent
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/valo-agent run
+Restart=always
+RestartSec=30
+# server URL: /etc/valolinux/agent.conf or kernel parameter valo.server=URL
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,19 @@
+#!/bin/sh
+# While the device waits for adoption, show the code (written by valo-agent).
+CODE_FILE=/run/valolinux/adoption-code
+pid=""
+while true; do
+    if [ -s "$CODE_FILE" ]; then
+        if [ -z "$pid" ] || ! kill -0 "$pid" 2>/dev/null; then
+            code=$(head -n1 "$CODE_FILE")
+            zenity --info --no-wrap --title="ValoLinux einrichten" \
+                --text="<span size='large'>Dieses Gerät ist noch nicht eingerichtet.</span>\n\nGib in der Verwaltung diesen Code ein:\n\n<span size='xx-large' weight='bold' font_family='monospace'>$code</span>" &
+            pid=$!
+        fi
+    elif [ -n "$pid" ]; then
+        kill "$pid" 2>/dev/null
+        pid=""
+        zenity --notification --text="ValoLinux: Gerät eingerichtet" 2>/dev/null &
+    fi
+    sleep 5
+done

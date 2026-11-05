@@ -20,11 +20,21 @@ plus eine Verwaltungsschicht (Agent + Web-UI).
 | `docs/home-und-konten.md` | Home-Verhalten, zentrale Konten (Entwurf) |
 | `docs/phasen.md` | Phasenplan mit Fortschritt |
 | `docs/verifikation.md` | Unsichere Fakten: was zu prüfen ist, Ergebnisse |
-| `image/` | Image-Build (Phase 1, mkosi/live-build) |
-| `agent/` | Geräte-Agent (Phase 3/4) |
-| `server/` | Web-UI + API (Phase 3) |
+| `docs/verwaltung.md` | Server, Web-UI, Agent: Start, Adoption, Einstellungen |
+| `image/` | Live-ISO (live-build), Build per GitHub Actions bei Release |
+| `crates/valo-proto/` | Gemeinsame Typen und Signaturen (Rust) |
+| `agent/` | Geräte-Agent (Rust) |
+| `server/` | Web-UI + API (Rust, Docker) |
 | `manifests/` | Beispiel-Manifeste je Rolle |
 | `tools/` | Hilfsskripte (z. B. RAM-Messung Phase 0) |
+
+## Schnellstart Verwaltung
+```bash
+docker compose -f server/docker-compose.yml up -d --build
+```
+Dann `http://<server>:8080` öffnen. Details: `docs/verwaltung.md`.
+
+![Übersicht](docs/img/ui/09-dashboard.png)
 
 ## Arbeitsregeln
 Siehe `docs/entscheidungen.md`, Abschnitt „Regeln". Kurz: bewährte Technik, alles reversibel,

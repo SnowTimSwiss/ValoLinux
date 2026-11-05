@@ -15,6 +15,10 @@ if [ -n "$missing" ]; then echo "ERROR: packages not found in Debian:$missing"; 
 
 ./fetch-apps.sh config/packages.chroot
 
+# Device agent (Rust), built from this repository
+( cd .. && cargo build --release --locked -p valo-agent )
+install -D -m 0755 ../target/release/valo-agent config/includes.chroot/usr/local/bin/valo-agent
+
 lb clean --purge || true
 lb config \
   --distribution trixie \

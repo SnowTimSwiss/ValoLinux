@@ -22,6 +22,14 @@ Stand: 2026-11-04
 - **Test-Image: Live-ISO mit `live-build`** (nicht mkosi), gebaut in GitHub Actions nur bei Release. A/B-Update-Image bleibt Phase 2.
 - Phase 0 (Messen) wird übersprungen.
 
+## Verwaltung (2026-11-05)
+- **Kein ansible-pull-Zwischenschritt**, direkt ein kleiner Rust-Agent: weniger bewegliche Teile auf dem Gerät (ein Binary, ~4 MB), kein Python/Ansible im Image.
+- **Web-UI serverseitig gerendert** (axum + maud), kein JavaScript-Framework: wenig Abhängigkeiten, wenig Pflege.
+- **SQLite** als Datenbank: eine Datei im Docker-Volume, reicht für Hunderte Geräte.
+- **Einstellungen in Ebenen** (Global → Rolle → Gruppe → Gerät), alle in der Web-UI.
+- **Transport vorerst HTTP(S)** mit ed25519-signierten Anfragen und Manifesten. iroh folgt in Phase 4.
+- Neue Abhängigkeiten: axum/tokio (Webserver), rusqlite (DB), maud (HTML), argon2/sha-crypt (Passwörter), ed25519-dalek (Signaturen), ureq (HTTP-Client im Agent), clap (CLI). Alles verbreitete, gepflegte Crates.
+
 ## Rückweg / Distro-Unabhängigkeit
 Frage aus dem Briefing: „oder würde etwas anderes Sinn machen?"
 

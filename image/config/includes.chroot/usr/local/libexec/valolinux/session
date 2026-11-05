@@ -1,0 +1,24 @@
+#!/bin/sh
+# ValoLinux X session: start helpers, run FlameWM, fall back to Openbox if FlameWM
+# fails right away (FlameWM is pre-release; see docs/verifikation.md).
+LOG="${XDG_CACHE_HOME:-$HOME/.cache}/valolinux-session.log"
+mkdir -p "$(dirname "$LOG")"
+
+/usr/local/libexec/valolinux/adoption-notice >>"$LOG" 2>&1 &
+
+FLAME=/usr/libexec/flamewm/flamewm-session-wrapper
+if [ -x "$FLAME" ]; then
+    start=$(date +%s)
+    "$FLAME" >>"$LOG" 2>&1
+    rc=$?
+    if [ "$rc" -eq 0 ] || [ $(( $(date +%s) - start )) -gt 20 ]; then
+        exit "$rc"
+    fi
+    echo "FlameWM exited with $rc after start, falling back to Openbox" >>"$LOG"
+    MSG="FlameWM konnte nicht starten (Code $rc). Notfall-Sitzung: Rechtsklick auf den Desktop für das Menü. Log: $LOG"
+else
+    MSG="FlameWM ist nicht installiert. Notfall-Sitzung: Rechtsklick auf den Desktop für das Menü."
+fi
+command -v xsetroot >/dev/null && xsetroot -solid '#1E1B54'
+(sleep 2; command -v zenity >/dev/null && zenity --warning --title=ValoLinux --text="$MSG") &
+exec openbox-session

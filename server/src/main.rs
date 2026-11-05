@@ -44,8 +44,28 @@ fn write_private(path: &std::path::Path, data: &[u8]) -> std::io::Result<()> {
     f.write_all(data)
 }
 
+/// `valo-server --healthcheck`: used by the container HEALTHCHECK (no curl in the image).
+fn healthcheck() -> ! {
+    use std::io::{Read, Write};
+    let listen = std::env::var("VALO_LISTEN").unwrap_or_else(|_| "0.0.0.0:8080".into());
+    let port = listen.rsplit(':').next().unwrap_or("8080");
+    let ok = std::net::TcpStream::connect(format!("127.0.0.1:{port}"))
+        .and_then(|mut s| {
+            s.set_read_timeout(Some(std::time::Duration::from_secs(2)))?;
+            s.write_all(b"GET /healthz HTTP/1.0\r\n\r\n")?;
+            let mut buf = String::new();
+            s.read_to_string(&mut buf)?;
+            Ok(buf.starts_with("HTTP/1.0 200") || buf.starts_with("HTTP/1.1 200"))
+        })
+        .unwrap_or(false);
+    std::process::exit(if ok { 0 } else { 1 })
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    if std::env::args().any(|a| a == "--healthcheck") {
+        healthcheck();
+    }
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),

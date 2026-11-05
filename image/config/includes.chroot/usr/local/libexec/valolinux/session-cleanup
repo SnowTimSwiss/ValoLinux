@@ -1,0 +1,20 @@
+#!/bin/sh
+# Run by LightDM as root after a session ends (session-cleanup-script).
+# Deletes the kiosk user's home if the server says so (/etc/valolinux/home-mode).
+set -u
+USER_NAME="${USER:-}"
+[ "$USER_NAME" = "valo" ] || exit 0
+[ "$(cat /etc/valolinux/home-mode 2>/dev/null)" = "wipe" ] || exit 0
+HOME_DIR=$(getent passwd valo | cut -d: -f6)
+case "$HOME_DIR" in
+    /home/valo) ;;            # only ever this exact path
+    *) exit 0 ;;
+esac
+# wait until no process of the user is left
+for _ in 1 2 3 4 5; do pgrep -u valo >/dev/null || break; sleep 1; done
+pkill -KILL -u valo 2>/dev/null
+rm -rf --one-file-system /home/valo
+mkdir -p /home/valo
+cp -a /etc/skel/. /home/valo/
+chown -R valo:valo /home/valo
+chmod 0750 /home/valo

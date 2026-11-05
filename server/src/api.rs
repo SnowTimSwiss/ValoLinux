@@ -19,6 +19,7 @@ const MAX_PENDING: usize = 1000;
 
 pub fn routes() -> Router<Shared> {
     Router::new()
+        .route("/healthz", get(|| async { "ok" }))
         .route("/api/v1/server-key", get(server_key))
         .route("/api/v1/enroll", post(enroll))
         .route("/api/v1/manifest", get(manifest))
