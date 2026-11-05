@@ -27,7 +27,19 @@ Alle Grafiken erzeugt `tools/make-branding.py` reproduzierbar (fester Zufallswer
 - `usr/share/backgrounds/valolinux-splash.png`: Boot-Menü, 640×480
 - `usr/share/pixmaps/valolinux-logo.png`: Logo 256×256 (Greeter-Benutzerbild)
 
-## Greeter-Optionen
+## Greeter (entschieden: LightDM GTK Greeter)
+Eigenes GTK-Theme **ValoLinux** (`usr/share/themes/ValoLinux/gtk-3.0/gtk.css`), baut auf dem in GTK eingebauten Adwaita dark auf und gestaltet nur den Greeter:
+- Login-Karte: dunkles, halbtransparentes Glas, runde Ecken, Logo als Benutzerbild
+- Eingabefelder mit Amber-Fokusring, Anmelden-Button im Sonnenverlauf (Sun → Amber → Rose)
+- Fehlermeldung in Rosé, obere Leiste mit Uhr, Sitzung und Ein/Aus, Menüs im gleichen Stil
+- Konfiguration: `etc/lightdm/lightdm-gtk-greeter.conf`
+
+![Greeter](img/greeter.png)
+![Greeter mit Fehlermeldung](img/greeter-fehler.png)
+
+**Vorschau ohne LightDM:** `tools/preview-greeter.py` lädt die originale `.glade`-Oberfläche des Greeters mit unserem Theme und macht in Xvfb einen Screenshot (Anleitung im Skriptkopf). Die Vorschau ist nah dran, aber nicht identisch mit dem echten Greeter (z. B. fehlen dort die Icons für Sitzung/Ein-Aus, der Schatten-Effekt fehlt in beiden, weil GTK3 ihn abschneidet).
+
+## Greeter-Optionen (Übersicht)
 | Greeter | Aussehen | Gewicht | Bemerkung |
 |---|---|---|---|
 | **LightDM GTK Greeter** (aktuell) | klassisch, gut anpassbar | sehr leicht | Stabil, in Debian |

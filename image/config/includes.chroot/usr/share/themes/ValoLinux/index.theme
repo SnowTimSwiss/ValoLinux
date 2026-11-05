@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=X-GNOME-Metatheme
+Name=ValoLinux
+Comment=ValoLinux greeter theme (based on Adwaita dark)
+Encoding=UTF-8
+
+[X-GNOME-Metatheme]
+GtkTheme=ValoLinux
+IconTheme=Adwaita

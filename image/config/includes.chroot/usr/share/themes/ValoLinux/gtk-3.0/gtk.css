@@ -1,0 +1,171 @@
+/* ValoLinux GTK3 theme, used by lightdm-gtk-greeter.
+ * Builds on GTK's built-in Adwaita dark and only restyles the greeter.
+ * Widget names (#login_window, ...) come from lightdm-gtk-greeter.glade.
+ * Palette: docs/design.md
+ */
+@import url("resource:///org/gtk/libgtk/theme/Adwaita/gtk-contained-dark.css");
+
+@define-color valo_night   #080B20;
+@define-color valo_indigo  #1E1B54;
+@define-color valo_violet  #582C80;
+@define-color valo_rose    #C45478;
+@define-color valo_amber   #F7A054;
+@define-color valo_sun     #FFD68C;
+@define-color valo_text    #EBE8FF;
+@define-color valo_muted   #A9A3D6;
+
+@define-color theme_selected_bg_color @valo_amber;
+@define-color theme_selected_fg_color @valo_night;
+
+* { outline-color: alpha(@valo_amber, 0.6); }
+
+/* ---------- login card ---------- */
+#login_window {
+  background-color: alpha(@valo_night, 0.74);
+  border: 1px solid alpha(@valo_text, 0.10);
+  border-radius: 20px;
+  border-top-color: alpha(@valo_text, 0.18);
+  color: @valo_text;
+  font-size: 11pt;
+}
+#login_window #content_frame,
+#login_window #buttonbox_frame {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+#login_window #content_frame { padding: 32px 36px 6px 36px; }
+#login_window #buttonbox_frame { padding: 4px 36px 28px 36px; }
+#login_window #content_frame > border,
+#login_window #buttonbox_frame > border { border: none; }
+
+#user_image_border {
+  border: none;
+  background: transparent;
+  padding: 0 0 6px 0;
+}
+#user_image_border > border { border: none; }
+
+/* ---------- inputs ---------- */
+#login_window entry,
+#login_window combobox button.combo {
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid alpha(@valo_text, 0.16);
+  background-color: alpha(@valo_text, 0.06);
+  background-image: none;
+  color: @valo_text;
+  box-shadow: none;
+  text-shadow: none;
+  font-weight: 500;
+}
+#login_window entry:focus,
+#login_window combobox button.combo:focus {
+  border-color: @valo_amber;
+  box-shadow: 0 0 0 3px alpha(@valo_amber, 0.22);
+}
+#login_window entry image { color: @valo_muted; }
+#login_window combobox button.combo:hover { background-color: alpha(@valo_text, 0.10); }
+#login_window entry selection { background-color: @valo_amber; color: @valo_night; }
+
+/* ---------- buttons ---------- */
+#login_window button,
+#power_window button {
+  min-height: 40px;
+  padding: 0 22px;
+  border-radius: 12px;
+  border: 1px solid alpha(@valo_text, 0.14);
+  background-image: none;
+  background-color: alpha(@valo_text, 0.06);
+  color: @valo_text;
+  box-shadow: none;
+  text-shadow: none;
+  font-weight: 600;
+}
+#login_window button:hover,
+#power_window button:hover { background-color: alpha(@valo_text, 0.12); }
+
+#login_window #login_button,
+#power_window #power_ok_button {
+  border: none;
+  background-image: linear-gradient(to right, @valo_sun, @valo_amber 45%, @valo_rose);
+  color: @valo_night;
+}
+#login_window #login_button label, #power_window #power_ok_button label { color: @valo_night; }
+#login_window #login_button:hover,
+#power_window #power_ok_button:hover {
+  background-image: linear-gradient(to right, shade(@valo_sun, 1.05), shade(@valo_amber, 1.08) 45%, shade(@valo_rose, 1.1));
+}
+#login_window #login_button:active,
+#power_window #power_ok_button:active { background-image: linear-gradient(to right, @valo_amber, @valo_rose); }
+
+#login_window #cancel_button,
+#power_window #power_cancel_button { background-color: transparent; border-color: alpha(@valo_text, 0.20); }
+
+/* ---------- messages ---------- */
+#greeter_infobar {
+  border-radius: 12px;
+  margin: 0 36px;
+}
+#greeter_infobar revealer > box {
+  background-image: none;
+  background-color: alpha(@valo_rose, 0.22);
+  border: 1px solid alpha(@valo_rose, 0.55);
+  border-radius: 12px;
+  color: @valo_text;
+}
+#message_label { color: @valo_text; font-weight: 500; }
+
+/* ---------- top panel ---------- */
+#panel_window {
+  background-color: alpha(@valo_night, 0.55);
+  border-bottom: 1px solid alpha(@valo_text, 0.08);
+  color: @valo_text;
+}
+#panel_window menubar {
+  background: transparent;
+  box-shadow: none;
+  border: none;
+  padding: 0 10px;
+  min-height: 34px;
+}
+#panel_window menubar > menuitem { padding: 6px 12px; border-radius: 8px; color: @valo_text; }
+#panel_window menubar > menuitem:hover { background-color: alpha(@valo_text, 0.12); box-shadow: none; }
+#panel_window menubar > menuitem label { color: @valo_text; }
+#clock_menuitem label { font-weight: 600; letter-spacing: 0.3px; }
+
+/* dropdown menus (session, power, ...) */
+menu, .menu, .context-menu {
+  background-color: alpha(@valo_night, 0.96);
+  border: 1px solid alpha(@valo_text, 0.12);
+  border-radius: 10px;
+  padding: 6px;
+  color: @valo_text;
+}
+menu menuitem { border-radius: 6px; padding: 6px 12px; }
+menu menuitem:hover { background-color: @valo_amber; color: @valo_night; }
+menu menuitem:hover label { color: @valo_night; }
+
+/* ---------- power dialog ---------- */
+#power_window {
+  background-color: alpha(@valo_night, 0.86);
+  border: 1px solid alpha(@valo_text, 0.10);
+  border-radius: 20px;
+  border-top-color: alpha(@valo_text, 0.18);
+  color: @valo_text;
+}
+#power_content_frame { padding: 28px 32px 8px 32px; background: transparent; }
+#power_buttonbox_frame { padding: 12px 32px 28px 32px; background: transparent; }
+#power_title { font-size: 15pt; font-weight: 700; color: white; }
+#power_text { color: @valo_muted; }
+#power_icon { color: @valo_amber; }
+
+/* Adwaita's .keycap class (set on login/power windows) adds a heavy bottom edge */
+#login_window.keycap,
+#power_window.keycap {
+  box-shadow: none;
+  border-width: 1px;
+  border-bottom-width: 1px;
+  border-bottom-color: alpha(@valo_text, 0.10);
+}
