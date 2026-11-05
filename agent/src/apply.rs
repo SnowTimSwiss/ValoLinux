@@ -288,7 +288,13 @@ pub fn clean_domain(input: &str) -> Option<String> {
 
 pub fn firefox(p: &mut Platform, s: &Settings) -> Result<Vec<String>, String> {
     let text = serde_json::to_string_pretty(&firefox_policies(s)).expect("json") + "\n";
-    let c = p.write("/etc/firefox/policies/policies.json", &text, 0o644)?;
+    // Mozilla documents /etc/firefox/policies; the distribution directory next to
+    // the binary works for every build. Which one Debian's firefox-esr reads is not
+    // verified yet (docs/verifikation.md), so write both.
+    let mut c = p.write("/etc/firefox/policies/policies.json", &text, 0o644)?;
+    if p.exists("/usr/lib/firefox-esr") {
+        c |= p.write("/usr/lib/firefox-esr/distribution/policies.json", &text, 0o644)?;
+    }
     Ok(changed(c, "Richtlinien aktualisiert"))
 }
 

@@ -21,6 +21,10 @@ impl Platform {
         self.root.join(p.trim_start_matches('/'))
     }
 
+    pub fn exists(&self, p: &str) -> bool {
+        self.path(p).exists()
+    }
+
     pub fn read(&self, p: &str) -> Option<String> {
         std::fs::read_to_string(self.path(p)).ok()
     }

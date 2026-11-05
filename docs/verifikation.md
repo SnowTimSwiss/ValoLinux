@@ -7,7 +7,7 @@ Ergebnisse hier eintragen (Datum, Methode, Resultat). Bis dahin gilt alles als *
 | ArtCraft-Suite: Reifegrad, DOCX/XLSX/PPTX-Verlust | offen | Pre-Alpha/Alpha laut Berichten |
 | FlameWM: echter RAM-Bedarf (README ~31+44 MB vs. Titel ~17 MB), X11-Stabilität | offen | |
 | iroh 1.0: eigener Relay konfigurierbar? | offen | |
-| Firefox ESR `policies.json`: Extensions erzwingen, Einstellungen sperren | offen | |
+| Firefox ESR `policies.json`: Extensions erzwingen, Einstellungen sperren; welcher Pfad gilt bei Debians `firefox-esr` (`/etc/firefox/policies/` oder `/usr/lib/firefox-esr/distribution/`)? | offen | Agent schreibt vorerst beide; im ISO prüfen mit `about:policies` |
 | Ecosia Family-Friendly-Modus per Policy/Suchmaschinen-URL setzbar? | offen | |
 | Adblocker (z. B. uBlock Origin) per Policy erzwingen | offen | |
 | RAM/Image-Grössen (Debian minimal, Desktop, Firefox) | offen | per `tools/phase0-measure.sh` messen |
