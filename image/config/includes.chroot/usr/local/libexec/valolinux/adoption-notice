@@ -1,8 +1,15 @@
 #!/bin/sh
 # While the device waits for adoption, show the code (written by valo-agent).
 CODE_FILE=/run/valolinux/adoption-code
+STATUS_FILE=/run/valolinux/status
 pid=""
+last_status=""
 while true; do
+    status=$(cat "$STATUS_FILE" 2>/dev/null)
+    if [ -n "$status" ] && [ "$status" != "$last_status" ]; then
+        zenity --notification --text="ValoLinux: $status" 2>/dev/null &
+    fi
+    last_status="$status"
     if [ -s "$CODE_FILE" ]; then
         if [ -z "$pid" ] || ! kill -0 "$pid" 2>/dev/null; then
             code=$(head -n1 "$CODE_FILE")

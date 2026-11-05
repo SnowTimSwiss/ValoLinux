@@ -34,3 +34,6 @@ xterm
 # ValoLinux session helpers (adoption code dialog, fallback background)
 zenity
 x11-xserver-utils
+# find the management server as valolinux.local (mDNS)
+avahi-daemon
+libnss-mdns

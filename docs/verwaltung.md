@@ -28,7 +28,7 @@ Umgebungsvariablen: `VALO_DATA_DIR` (Standard `./data`), `VALO_LISTEN` (`0.0.0.0
 **Sicherung:** Das Verzeichnis `/data` (Docker-Volume `valo-data`) enthält Datenbank **und** Server-Schlüssel. Geht der Schlüssel verloren, müssen alle Geräte neu hinzugefügt werden.
 
 ## Gerät hinzufügen (Adoption)
-1. Gerät mit ValoLinux starten. Server-Adresse kommt aus `/etc/valolinux/agent.conf` (`server = http://…`) oder dem Boot-Parameter `valo.server=http://…`.
+1. Gerät mit ValoLinux starten. Die Server-Adresse kommt, in dieser Reihenfolge, aus `/etc/valolinux/agent.conf` (`server = http://…`), dem Boot-Parameter `valo.server=http://…` oder der automatischen Suche: `http://valolinux.local:8080` (Server-Rechner heisst `valolinux`, mDNS) und `http://valolinux:8080` (DNS-Eintrag `valolinux` im Schulnetz).
 2. Das Gerät zeigt einen 6-stelligen Code (Dialog auf dem Desktop und auf der Konsole vor dem Login).
 3. In der Web-UI unter **Hinzufügen** den Code eingeben, Name, Rolle (Schüler/in, Lehrperson) und Gruppe wählen.
 4. Innert ca. 10 Sekunden holt sich das Gerät seine Konfiguration. Danach prüft es alle 5 Minuten.

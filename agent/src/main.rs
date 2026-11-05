@@ -147,6 +147,23 @@ fn configured_server(root: &Path) -> Option<String> {
     })
 }
 
+/// Well-known addresses tried when nothing is configured: a host named
+/// "valolinux" via mDNS (.local) or the school's DNS.
+const DISCOVERY_CANDIDATES: &[&str] = &["http://valolinux.local:8080", "http://valolinux:8080"];
+
+/// Find a server that answers /healthz.
+fn discover() -> Option<String> {
+    let http: ureq::Agent = ureq::Agent::config_builder()
+        .timeout_global(Some(Duration::from_secs(3)))
+        .http_status_as_error(false)
+        .build()
+        .into();
+    DISCOVERY_CANDIDATES.iter().find_map(|base| {
+        let ok = http.get(format!("{base}/healthz")).call().map(|r| r.status().as_u16() == 200).unwrap_or(false);
+        ok.then(|| base.to_string())
+    })
+}
+
 fn format_code(code: &str) -> String {
     if code.len() == 6 { format!("{}-{}", &code[..3], &code[3..]) } else { code.to_string() }
 }
@@ -208,6 +225,16 @@ impl Agent {
                 let _ = p.remove("/etc/issue.d/valolinux.issue");
             }
         }
+    }
+
+    /// Human-readable state for the desktop helper (/run/valolinux/status).
+    fn set_status(&self, text: &str) {
+        let mut p = self.platform();
+        let _ = if text.is_empty() {
+            p.remove("/run/valolinux/status").map(|_| true)
+        } else {
+            p.write("/run/valolinux/status", &format!("{text}\n"), 0o644)
+        };
     }
 
     fn applied(&self) -> apply::Applied {
@@ -329,10 +356,22 @@ fn run(cli: Cli) -> Result<(), String> {
             println!("Apps:     {}", if st.managed_apps.is_empty() { "-".into() } else { st.managed_apps.join(", ") });
         }
         Cmd::Run { server, interval, once } => {
-            let url = server
-                .or_else(|| agent.binding().map(|b| b.url))
-                .or_else(|| configured_server(&agent.root))
-                .ok_or("no server configured (set server= in /etc/valolinux/agent.conf or valo.server= on the kernel command line)")?;
+            let explicit = server.or_else(|| agent.binding().map(|b| b.url)).or_else(|| configured_server(&agent.root));
+            let url = match explicit {
+                Some(u) => u,
+                None => loop {
+                    if let Some(u) = discover() {
+                        println!("Server gefunden: {u}");
+                        break u;
+                    }
+                    agent.set_status("Kein Verwaltungsserver gefunden. Server-Adresse in /etc/valolinux/agent.conf eintragen oder mit valo.server=http://… starten.");
+                    if once {
+                        return Err("no server configured or found".into());
+                    }
+                    std::thread::sleep(Duration::from_secs(30));
+                },
+            };
+            agent.set_status("");
             let mut binding = agent.binding().filter(|b| b.url == url);
             if let Some(b) = &binding {
                 agent.apply_cached(b);
