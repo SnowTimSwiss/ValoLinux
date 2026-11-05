@@ -1,13 +1,25 @@
-# DRAFT, UNTESTED. Builds the ValoLinux live ISO only when a GitHub release is published,
-# and attaches it to that release. Can be changed later (schedule, manual) as needed.
-name: build-image
+# Runs only when a GitHub release is published (can be changed later: schedule, manual).
+#   1. test:         cargo test for server, agent and shared crate
+#   2. iso:          live ISO (incl. valo-agent) -> attached to the release
+#   3. server-image: Docker image -> ghcr.io/<owner>/valolinux-server:<tag> and :latest
+#   4. agent:        valo-agent binary -> attached to the release
+# DRAFT: the ISO and container jobs have not run on GitHub yet.
+name: release
 on:
   release:
     types: [published]
 permissions:
   contents: write
 jobs:
-  build:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: cargo test
+        run: cargo test --workspace --locked
+
+  iso:
+    needs: test
     runs-on: ubuntu-24.04
     container:
       image: debian:trixie
@@ -23,7 +35,7 @@ jobs:
           apt-get install -y --no-install-recommends git ca-certificates gh live-build debootstrap \
             squashfs-tools xorriso grub-pc-bin grub-efi-amd64-bin mtools dosfstools syslinux syslinux-common \
             isolinux curl build-essential pkg-config sudo
-          # Rust only needed for the FlameWM source fallback
+          # Rust: valo-agent (and the FlameWM source fallback)
           curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
       - uses: actions/checkout@v4
       - name: Build ISO
@@ -42,3 +54,53 @@ jobs:
           path: out/*
       - name: Attach to release
         run: gh release upload "${{ github.event.release.tag_name }}" out/* --clobber --repo "$GITHUB_REPOSITORY"
+
+  server-image:
+    needs: test
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Image name (lowercase)
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/valolinux-server" >> "$GITHUB_ENV"
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: server/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ github.event.release.tag_name }}
+            ${{ env.IMAGE }}:latest
+
+  agent:
+    needs: test
+    runs-on: ubuntu-24.04
+    # built on Debian trixie so the binary matches the image's glibc
+    container: debian:trixie
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Install tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates curl build-essential git gh
+          curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          . "$HOME/.cargo/env"
+          cargo build --release --locked -p valo-agent
+          mkdir -p out
+          cp target/release/valo-agent "out/valo-agent-${{ github.event.release.tag_name }}-linux-amd64"
+          cd out && sha256sum valo-agent-* > SHA256SUMS-agent
+      - name: Attach to release
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          gh release upload "${{ github.event.release.tag_name }}" out/* --clobber --repo "$GITHUB_REPOSITORY"

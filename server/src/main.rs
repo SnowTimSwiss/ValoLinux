@@ -44,6 +44,23 @@ fn write_private(path: &std::path::Path, data: &[u8]) -> std::io::Result<()> {
     f.write_all(data)
 }
 
+#[cfg(unix)]
+fn restrict_data_dir(dir: &std::path::Path) {
+    use std::os::unix::fs::PermissionsExt;
+    let set = |p: &std::path::Path, mode| {
+        if let Err(e) = std::fs::set_permissions(p, std::fs::Permissions::from_mode(mode)) {
+            tracing::warn!("cannot restrict permissions of {}: {e}", p.display());
+        }
+    };
+    set(dir, 0o700);
+    for f in ["valo.db", "valo.db-wal", "valo.db-shm"] {
+        let p = dir.join(f);
+        if p.exists() {
+            set(&p, 0o600);
+        }
+    }
+}
+
 /// `valo-server --healthcheck`: used by the container HEALTHCHECK (no curl in the image).
 fn healthcheck() -> ! {
     use std::io::{Read, Write};
@@ -79,6 +96,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let key = load_or_create_key(&data_dir.join("server.key"))?;
     let db = db::Db::open(&data_dir.join("valo.db"))?;
+    // the database holds per-device admin passwords: owner only
+    restrict_data_dir(&data_dir);
     tracing::info!("server public key: {}", key.public_key());
 
     let state = Arc::new(AppState { db, key, secure_cookies });
