@@ -24,3 +24,10 @@ adduser
 live-boot
 live-config
 live-config-systemd
+# German/Swiss locale and keyboard (set via live-config boot parameters)
+locales
+keyboard-configuration
+tzdata
+# Fallback session if FlameWM does not start: pick "Openbox" in the greeter, right-click for a menu
+openbox
+xterm

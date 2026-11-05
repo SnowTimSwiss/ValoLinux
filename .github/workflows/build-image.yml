@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Install tools
         run: |
+          # enable contrib/non-free-firmware so the package preflight sees firmware packages
+          sed -i "s/^Components: main$/Components: main contrib non-free-firmware/" /etc/apt/sources.list.d/debian.sources
           apt-get update
           apt-get install -y --no-install-recommends git ca-certificates gh live-build debootstrap \
             squashfs-tools xorriso grub-pc-bin grub-efi-amd64-bin mtools dosfstools syslinux syslinux-common \

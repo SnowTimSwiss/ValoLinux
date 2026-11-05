@@ -6,6 +6,13 @@ cd "$(dirname "$0")"
 out="${1:-$PWD/out}"
 mkdir -p config/packages.chroot "$out"
 
+# Preflight: fail fast if a package from our list does not exist in Debian (before the long build)
+missing=""
+for p in $(grep -v -E '^\s*(#|$)' config/package-lists/*.list.chroot); do
+  apt-cache show "$p" >/dev/null 2>&1 || missing="$missing $p"
+done
+if [ -n "$missing" ]; then echo "ERROR: packages not found in Debian:$missing"; exit 1; fi
+
 ./fetch-apps.sh config/packages.chroot
 
 lb clean --purge || true
@@ -21,7 +28,7 @@ lb config \
   --security true --updates true \
   --iso-volume "VALOLINUX" \
   --image-name valolinux \
-  --bootappend-live "boot=live components live-config.username=valo"
+  --bootappend-live "boot=live components live-config.username=valo live-config.locales=de_CH.UTF-8 live-config.keyboard-layouts=ch live-config.timezone=Europe/Zurich"
 
 # Boot menu branding (best effort, UNTESTED): copy live-build's bootloader templates and rename the title.
 if [ -d /usr/share/live/build/bootloaders ]; then
