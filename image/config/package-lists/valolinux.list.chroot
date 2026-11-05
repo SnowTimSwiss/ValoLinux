@@ -12,6 +12,7 @@ flatpak
 systemd-zram-generator
 network-manager
 fonts-dejavu-core
+fonts-inter
 fonts-noto-core
 firmware-linux
 adwaita-icon-theme
