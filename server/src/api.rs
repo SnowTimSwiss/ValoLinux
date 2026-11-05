@@ -106,6 +106,7 @@ pub fn build_manifest(s: &Shared, d: &Device) -> Result<SignedManifest, rusqlite
         settings,
         admin_password_hash: d.admin_password_hash.clone(),
         apps,
+        actions: s.db.pending_actions(d.id)?,
         issued_at: now_unix(),
     };
     m.compute_revision();
@@ -142,7 +143,7 @@ async fn report(State(s): State<Shared>, headers: HeaderMap, body: Bytes) -> Res
     };
     r.messages.truncate(50);
     match s.db.device_by_key(&key) {
-        Ok(Some(d)) => match s.db.record_report(d.id, &r) {
+        Ok(Some(d)) => match s.db.record_report(d.id, &r).and_then(|_| s.db.mark_actions_done(d.id, &r.done_actions)) {
             Ok(()) => StatusCode::NO_CONTENT.into_response(),
             Err(e) => internal(e),
         },

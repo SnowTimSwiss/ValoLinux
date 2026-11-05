@@ -37,6 +37,8 @@ pub fn routes() -> Router<Shared> {
         .route("/devices/{id}", get(device_page).post(device_update))
         .route("/devices/{id}/password", post(device_password))
         .route("/devices/{id}/delete", post(device_delete))
+        .route("/devices/{id}/action", post(device_action))
+        .route("/groups/{id}/action", post(group_action))
         .route("/adopt", get(adopt_page).post(adopt_submit))
         .route("/groups", get(groups_page).post(group_create))
         .route("/groups/{id}/delete", post(group_delete))
@@ -486,6 +488,7 @@ async fn device_page(State(s): State<Shared>, admin: Admin, Path(id): Path<i64>,
         .and_then(|m| serde_json::from_str::<valo_proto::Manifest>(&m.payload).ok())
         .map(|m| m.revision);
     let in_sync = current_rev.is_some() && current_rev == d.last_revision;
+    let actions = s.db.recent_actions(d.id).map_err(e500)?;
 
     // effective value + which layer set it
     let mut effective: Vec<(&Field, Option<Value>, String)> = vec![];
@@ -529,6 +532,41 @@ async fn device_page(State(s): State<Shared>, admin: Admin, Path(id): Path<i64>,
                     onsubmit="return confirm('Neues Passwort erzeugen? Das alte gilt nach dem nächsten Abgleich nicht mehr.')" {
                     (csrf(&admin))
                     button type="submit" { "Neues Passwort erzeugen" }
+                }
+            }
+            section.card {
+                h2 { "Aktionen" }
+                p.muted { "Das Gerät führt die Aktion beim nächsten Abgleich aus (innert ca. 1 Minute, wenn es eingeschaltet ist)." }
+                div.action-row {
+                    @for (kind, label) in ACTIONS {
+                        form method="post" action={"/devices/" (d.id) "/action"}
+                            onsubmit={"return confirm('" (label) "?')"} {
+                            (csrf(&admin)) input type="hidden" name="kind" value=(kind);
+                            button type="submit" { (label) }
+                        }
+                    }
+                }
+                @if !actions.is_empty() {
+                    table.list.compact {
+                        tbody {
+                            @for (kind, created, done) in &actions {
+                                tr {
+                                    td { (action_label(kind)) }
+                                    td.muted { (ago(Some(*created))) }
+                                    td { @match done {
+                                        Some(t) => span.pill.good { span.dot {} "ausgeführt " (ago(Some(*t))) },
+                                        None => span.pill.wait { span.dot {} "wartet" },
+                                    } }
+                                }
+                            }
+                        }
+                    }
+                    @if actions.iter().any(|a| a.2.is_none()) {
+                        form method="post" action={"/devices/" (d.id) "/action"} {
+                            (csrf(&admin)) input type="hidden" name="kind" value="cancel";
+                            button.link type="submit" { "Wartende Aktionen abbrechen" }
+                        }
+                    }
                 }
             }
             section.card {
@@ -603,6 +641,43 @@ async fn device_password(State(s): State<Shared>, admin: Admin, Path(id): Path<i
     let pw = util::admin_password();
     s.db.set_admin_password(id, &pw, &util::crypt_sha512(&pw)).map_err(e500)?;
     Ok(redirect_msg(&format!("/devices/{id}"), "Neues Admin-Passwort erzeugt."))
+}
+
+const ACTIONS: &[(&str, &str)] = &[("reboot", "Neu starten"), ("poweroff", "Ausschalten")];
+
+fn action_label(kind: &str) -> &str {
+    ACTIONS.iter().find(|(k, _)| *k == kind).map(|(_, l)| *l).unwrap_or(kind)
+}
+
+async fn device_action(State(s): State<Shared>, admin: Admin, Path(id): Path<i64>, body: String) -> Page {
+    let f = FormData::parse(&body);
+    admin.check_csrf(&f)?;
+    s.db.device(id).map_err(e500)?.ok_or_else(not_found)?;
+    let kind = f.text("kind");
+    if kind == "cancel" {
+        s.db.cancel_actions(id).map_err(e500)?;
+        return Ok(redirect_msg(&format!("/devices/{id}"), "Wartende Aktionen abgebrochen."));
+    }
+    if !ACTIONS.iter().any(|(k, _)| *k == kind) {
+        return Ok(redirect_err(&format!("/devices/{id}"), "Unbekannte Aktion."));
+    }
+    s.db.queue_action(id, &kind).map_err(e500)?;
+    Ok(redirect_msg(&format!("/devices/{id}"), &format!("{}: wird beim nächsten Abgleich ausgeführt.", action_label(&kind))))
+}
+
+async fn group_action(State(s): State<Shared>, admin: Admin, Path(id): Path<i64>, body: String) -> Page {
+    let f = FormData::parse(&body);
+    admin.check_csrf(&f)?;
+    let kind = f.text("kind");
+    if !ACTIONS.iter().any(|(k, _)| *k == kind) {
+        return Ok(redirect_err("/groups", "Unbekannte Aktion."));
+    }
+    let devices: Vec<Device> =
+        s.db.devices().map_err(e500)?.into_iter().filter(|d| d.adopted() && d.group_id == Some(id)).collect();
+    for d in &devices {
+        s.db.queue_action(d.id, &kind).map_err(e500)?;
+    }
+    Ok(redirect_msg("/groups", &format!("{}: an {} Geräte gesendet.", action_label(&kind), devices.len())))
 }
 
 async fn device_delete(State(s): State<Shared>, admin: Admin, Path(id): Path<i64>, body: String) -> Page {
@@ -709,10 +784,19 @@ async fn groups_page(State(s): State<Shared>, admin: Admin, Query(q): Q) -> Page
             @for g in &groups {
                 div.tile {
                     h3 { (g.name) }
-                    p.muted { (g.device_count) " Geräte" }
+                    p.muted { (g.device_count) (if g.device_count == 1 { " Gerät" } else { " Geräte" }) }
                     div.tile-actions {
                         a.button href={"/devices?group=" (g.id)} { "Geräte" }
                         a.button href={"/settings/group:" (g.id)} { "Einstellungen" }
+                    }
+                    div.tile-actions {
+                        @for (kind, label) in ACTIONS {
+                            form method="post" action={"/groups/" (g.id) "/action"}
+                                onsubmit={"return confirm('Alle Geräte in " (g.name) ": " (label) "?')"} {
+                                (csrf(&admin)) input type="hidden" name="kind" value=(kind);
+                                button.small-btn type="submit" { "Alle: " (label) }
+                            }
+                        }
                         form method="post" action={"/groups/" (g.id) "/delete"}
                             onsubmit="return confirm('Gruppe löschen? Die Geräte bleiben erhalten.')" {
                             (csrf(&admin)) button.link.danger-text type="submit" { "Löschen" }

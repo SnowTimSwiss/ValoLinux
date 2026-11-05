@@ -21,11 +21,32 @@ pub struct Applied {
     pub admin_hash: Option<String>,
     /// Flatpaks installed by us (we never remove anything we did not install).
     pub managed_apps: Vec<String>,
+    /// Ids of one-off actions already handled (most recent last).
+    #[serde(default)]
+    pub done_actions: Vec<i64>,
 }
 
 pub struct Outcome {
     pub ok: bool,
     pub messages: Vec<String>,
+}
+
+/// Mark new actions as handled and return them. They run after the report is sent
+/// (a reboot would otherwise cut the report off).
+pub fn take_new_actions(m: &Manifest, state: &mut Applied) -> Vec<valo_proto::Action> {
+    let new: Vec<_> = m.actions.iter().filter(|a| !state.done_actions.contains(&a.id)).cloned().collect();
+    state.done_actions.extend(new.iter().map(|a| a.id));
+    let excess = state.done_actions.len().saturating_sub(200);
+    state.done_actions.drain(..excess);
+    new
+}
+
+pub fn run_action(p: &mut Platform, a: &valo_proto::Action) -> Result<(), String> {
+    match a.kind.as_str() {
+        "reboot" => p.run("systemctl", &["reboot"]).map(|_| ()),
+        "poweroff" => p.run("systemctl", &["poweroff"]).map(|_| ()),
+        other => Err(format!("unbekannte Aktion {other}")),
+    }
 }
 
 pub fn apply(p: &mut Platform, m: &Manifest, state: &mut Applied) -> Outcome {
@@ -339,6 +360,7 @@ mod tests {
                 .into_iter()
                 .map(|r| CatalogApp { id: r.into(), name: r.into(), flatpak_ref: r.into() })
                 .collect(),
+            actions: vec![],
             issued_at: 0,
         }
     }
@@ -386,6 +408,20 @@ mod tests {
         apply(&mut p3, &m3, &mut st);
         assert!(p3.log.iter().any(|l| l.contains("flatpak uninstall") && l.contains("org.gimp.GIMP")));
         assert!(st.managed_apps.is_empty());
+    }
+
+    #[test]
+    fn actions_run_once() {
+        let mut m = manifest(Settings::default(), vec![]);
+        m.actions = vec![valo_proto::Action { id: 7, kind: "reboot".into() }];
+        let mut st = Applied::default();
+        assert_eq!(take_new_actions(&m, &mut st).len(), 1);
+        assert!(take_new_actions(&m, &mut st).is_empty());
+        let dir = tempfile::tempdir().unwrap();
+        let mut p = Platform::new(dir.path(), true);
+        run_action(&mut p, &m.actions[0]).unwrap();
+        assert_eq!(p.log.last().unwrap(), "run systemctl reboot");
+        assert!(run_action(&mut p, &valo_proto::Action { id: 8, kind: "format".into() }).is_err());
     }
 
     #[test]

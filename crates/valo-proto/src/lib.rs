@@ -163,9 +163,17 @@ pub struct CatalogApp {
     pub flatpak_ref: String,
 }
 
+/// One-off command for a device (e.g. restart). Executed once, then reported back.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Action {
+    pub id: i64,
+    /// "reboot" | "poweroff"
+    pub kind: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Manifest {
-    /// Changes whenever anything in the manifest changes.
+    /// Changes whenever the configuration changes (not for actions or issued_at).
     pub revision: String,
     pub device_name: String,
     /// "student" | "teacher"
@@ -176,6 +184,9 @@ pub struct Manifest {
     pub admin_password_hash: Option<String>,
     /// Apps referenced by `settings.apps`, resolved from the catalog.
     pub apps: Vec<CatalogApp>,
+    /// Pending one-off actions.
+    #[serde(default)]
+    pub actions: Vec<Action>,
     pub issued_at: i64,
 }
 
@@ -192,6 +203,7 @@ impl Manifest {
 struct ManifestForHash<'a>(#[serde(serialize_with = "ser_without_time")] &'a Manifest);
 
 fn ser_without_time<S: serde::Serializer>(m: &&Manifest, s: S) -> Result<S::Ok, S::Error> {
+    // actions are not configuration: they must not make the device look out of date
     (&m.device_name, &m.role, &m.group, &m.settings, &m.admin_password_hash, &m.apps).serialize(s)
 }
 
@@ -220,6 +232,9 @@ pub struct Report {
     pub hostname: String,
     #[serde(default)]
     pub os: String,
+    /// Ids of actions executed (or skipped as unknown) by the agent.
+    #[serde(default)]
+    pub done_actions: Vec<i64>,
 }
 
 // ---------------------------------------------------------------------------
@@ -339,6 +354,7 @@ mod tests {
             settings: Settings::defaults(),
             admin_password_hash: None,
             apps: vec![],
+            actions: vec![],
             issued_at: 1,
         };
         m.compute_revision();

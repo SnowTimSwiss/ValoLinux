@@ -210,6 +210,7 @@ async fn full_adoption_flow() {
         agent_version: "0.1.0".into(),
         hostname: "valo-test".into(),
         os: String::new(),
+        done_actions: vec![],
     };
     let (st, _, _) = send(&s, signed(&dev, "POST", "/api/v1/report", serde_json::to_vec(&report).unwrap())).await;
     assert_eq!(st, StatusCode::NO_CONTENT);
@@ -347,4 +348,41 @@ async fn password_change_and_admins() {
     let me = s.db.admin_by_name("admin").unwrap().unwrap().id;
     send(&s, form(&format!("/account/admins/{me}/delete"), &cookie, &format!("csrf={csrf}"))).await;
     assert_eq!(s.db.admins().unwrap().len(), 2, "cannot delete yourself");
+}
+
+#[tokio::test]
+async fn remote_actions_roundtrip() {
+    let s = state();
+    let (cookie, csrf) = login(&s).await;
+    let dev = Identity::generate().unwrap();
+    let req = EnrollRequest {
+        public_key: dev.public_key(),
+        hostname: "pc".into(),
+        os: String::new(),
+        agent_version: String::new(),
+        hardware: String::new(),
+    };
+    let (_, _, body) = send(&s, signed(&dev, "POST", "/api/v1/enroll", serde_json::to_vec(&req).unwrap())).await;
+    let code = serde_json::from_str::<EnrollResponse>(&body).unwrap().code;
+    s.db.create_group("7b").unwrap();
+    let gid = s.db.groups().unwrap()[0].id;
+    send(&s, form("/adopt", &cookie, &format!("csrf={csrf}&code={code}&role=student&group={gid}"))).await;
+    let did = s.db.device_by_key(&dev.public_key()).unwrap().unwrap().id;
+
+    // unknown kinds are refused, the same action is only queued once
+    send(&s, form(&format!("/devices/{did}/action"), &cookie, &format!("csrf={csrf}&kind=rm-rf"))).await;
+    send(&s, form(&format!("/devices/{did}/action"), &cookie, &format!("csrf={csrf}&kind=reboot"))).await;
+    send(&s, form(&format!("/groups/{gid}/action"), &cookie, &format!("csrf={csrf}&kind=reboot"))).await;
+    let ManifestResponse::Adopted { manifest: m } = manifest(&s, &dev).await else { panic!() };
+    let m = m.open(&s.key.public_key()).unwrap();
+    assert_eq!(m.actions.len(), 1);
+    assert_eq!(m.actions[0].kind, "reboot");
+
+    let report = Report { revision: Some(m.revision), ok: true, done_actions: vec![m.actions[0].id], ..Default::default() };
+    send(&s, signed(&dev, "POST", "/api/v1/report", serde_json::to_vec(&report).unwrap())).await;
+    let ManifestResponse::Adopted { manifest: m2 } = manifest(&s, &dev).await else { panic!() };
+    assert!(m2.open(&s.key.public_key()).unwrap().actions.is_empty());
+    let (st, _, body) = send(&s, get(&format!("/devices/{did}"), &cookie)).await;
+    assert_eq!(st, StatusCode::OK);
+    assert!(body.contains("ausgeführt"));
 }

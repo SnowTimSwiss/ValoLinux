@@ -51,6 +51,13 @@ CREATE TABLE IF NOT EXISTS devices (
     last_ok INTEGER,
     last_messages TEXT NOT NULL DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS actions (
+    id INTEGER PRIMARY KEY,
+    device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL,
+    created INTEGER NOT NULL,
+    done INTEGER
+);
 CREATE TABLE IF NOT EXISTS policies (
     scope TEXT PRIMARY KEY,
     json TEXT NOT NULL
@@ -440,7 +447,8 @@ impl Db {
 
     pub fn record_report(&self, id: i64, r: &valo_proto::Report) -> Result<()> {
         self.c().execute(
-            "UPDATE devices SET last_seen = ?2, last_revision = ?3, last_ok = ?4, last_messages = ?5, \
+            "UPDATE devices SET last_seen = ?2, last_revision = ?3, last_ok = ?4, \
+             last_messages = CASE WHEN ?5 = '' THEN last_messages ELSE ?5 END, \
              agent_version = ?6, hostname = CASE WHEN ?7 = '' THEN hostname ELSE ?7 END, \
              os = CASE WHEN ?8 = '' THEN os ELSE ?8 END WHERE id = ?1",
             params![
@@ -455,6 +463,48 @@ impl Db {
             ],
         )?;
         Ok(())
+    }
+
+    // ----- actions -----------------------------------------------------------
+
+    /// Queue an action unless the same one is already waiting.
+    pub fn queue_action(&self, device_id: i64, kind: &str) -> Result<()> {
+        self.c().execute(
+            "INSERT INTO actions (device_id, kind, created) SELECT ?1, ?2, ?3 \
+             WHERE NOT EXISTS (SELECT 1 FROM actions WHERE device_id = ?1 AND kind = ?2 AND done IS NULL)",
+            params![device_id, kind, now_unix()],
+        )?;
+        Ok(())
+    }
+
+    pub fn pending_actions(&self, device_id: i64) -> Result<Vec<valo_proto::Action>> {
+        let c = self.c();
+        let mut st = c.prepare("SELECT id, kind FROM actions WHERE device_id = ?1 AND done IS NULL ORDER BY id")?;
+        st.query_map([device_id], |r| Ok(valo_proto::Action { id: r.get(0)?, kind: r.get(1)? }))?.collect()
+    }
+
+    pub fn mark_actions_done(&self, device_id: i64, ids: &[i64]) -> Result<()> {
+        let c = self.c();
+        for id in ids {
+            c.execute(
+                "UPDATE actions SET done = ?3 WHERE id = ?1 AND device_id = ?2 AND done IS NULL",
+                params![id, device_id, now_unix()],
+            )?;
+        }
+        Ok(())
+    }
+
+    pub fn cancel_actions(&self, device_id: i64) -> Result<()> {
+        self.c().execute("DELETE FROM actions WHERE device_id = ?1 AND done IS NULL", [device_id])?;
+        Ok(())
+    }
+
+    /// Last actions of a device: (kind, created, done)
+    pub fn recent_actions(&self, device_id: i64) -> Result<Vec<(String, i64, Option<i64>)>> {
+        let c = self.c();
+        let mut st =
+            c.prepare("SELECT kind, created, done FROM actions WHERE device_id = ?1 ORDER BY id DESC LIMIT 5")?;
+        st.query_map([device_id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?.collect()
     }
 
     // ----- groups ------------------------------------------------------------

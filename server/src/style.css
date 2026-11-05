@@ -232,3 +232,5 @@ body.auth { min-height: 100vh; display: grid; place-items: center; padding: 20px
 .qr img { display: block; image-rendering: pixelated; }
 h3.mt { margin: 20px 0 10px; }
 form.inline.two { grid-template-columns: 1fr 1fr auto; }
+.action-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.small-btn { min-height: 32px; padding: 4px 10px; font-size: 13px; font-weight: 500; }

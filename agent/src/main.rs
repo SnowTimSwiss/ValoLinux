@@ -41,7 +41,7 @@ enum Cmd {
         #[arg(long)]
         server: Option<String>,
         /// Seconds between checks once adopted.
-        #[arg(long, default_value_t = 300)]
+        #[arg(long, default_value_t = 60)]
         interval: u64,
         /// Do a single check and exit.
         #[arg(long)]
@@ -241,10 +241,17 @@ impl Agent {
         read_json(&self.state_dir.join("applied.json")).unwrap_or_default()
     }
 
-    fn apply_and_report(&self, m: &valo_proto::Manifest, c: Option<&client::Client>) -> Result<(), String> {
+    /// Apply the configuration (if `configure`), report, then run new actions.
+    fn apply_and_report(&self, m: &valo_proto::Manifest, c: Option<&client::Client>, configure: bool) -> Result<(), String> {
         let mut state = self.applied();
         let mut p = self.platform();
-        let out = apply::apply(&mut p, m, &mut state);
+        let out = if configure {
+            apply::apply(&mut p, m, &mut state)
+        } else {
+            apply::Outcome { ok: state.ok, messages: vec![] }
+        };
+        // offline (no client): don't run actions from a possibly old cached manifest
+        let actions = if c.is_some() { apply::take_new_actions(m, &mut state) } else { vec![] };
         write_json(&self.state_dir.join("applied.json"), &state)?;
         for line in &out.messages {
             println!("  {line}");
@@ -262,10 +269,20 @@ impl Agent {
                 agent_version: VERSION.into(),
                 hostname: hostname(),
                 os: os_name(&self.root),
+                done_actions: actions.iter().map(|a| a.id).collect(),
             };
             let r = c.post_json("/api/v1/report", &report)?;
             if r.status >= 300 {
                 return Err(format!("report failed ({})", r.status));
+            }
+        }
+        for a in &actions {
+            println!("Aktion: {}", a.kind);
+            if let Err(e) = apply::run_action(&mut p, a) {
+                eprintln!("{e}");
+            }
+            if self.dry_run || self.root != Path::new("/") {
+                println!("  [dry-run] {}", p.log.last().cloned().unwrap_or_default());
             }
         }
         Ok(())
@@ -293,9 +310,13 @@ impl Agent {
                 self.show_code(None, &binding.url);
                 write_json(&self.state_dir.join("manifest.json"), &manifest)?;
                 let st = self.applied();
-                if st.revision.as_deref() != Some(&m.revision) || !st.ok {
+                let outdated = st.revision.as_deref() != Some(&m.revision) || !st.ok;
+                let new_actions = m.actions.iter().any(|a| !st.done_actions.contains(&a.id));
+                if outdated {
                     println!("Wende Konfiguration {} an ({}, {})", m.revision, m.device_name, m.role);
-                    self.apply_and_report(&m, Some(&c))?;
+                }
+                if outdated || new_actions {
+                    self.apply_and_report(&m, Some(&c), outdated)?;
                 }
                 Ok(true)
             }
@@ -308,7 +329,7 @@ impl Agent {
         match signed.open(&binding.server_key) {
             Ok(m) if self.applied().revision.as_deref() != Some(&m.revision) => {
                 println!("Server nicht erreichbar, wende gespeicherte Konfiguration {} an", m.revision);
-                let _ = self.apply_and_report(&m, None);
+                let _ = self.apply_and_report(&m, None, true);
             }
             Ok(_) => {}
             Err(e) => eprintln!("cached manifest invalid: {e}"),
