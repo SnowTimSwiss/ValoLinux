@@ -81,6 +81,7 @@ pub fn apply_with(p: &mut Platform, m: &Manifest, state: &mut Applied, files: &D
     step("Hintergrund", wallpaper(p, s, files));
     step("Admin-Konto", admin_account(p, m, state));
     step("Apps", apps(p, m, state));
+    step("Startmenü", start_menu(p, m));
     step("Identität", identity(p, m));
     if messages.is_empty() {
         messages.push("keine Änderungen nötig".into());
@@ -431,6 +432,47 @@ pub fn apps(p: &mut Platform, m: &Manifest, state: &mut Applied) -> Result<Vec<S
     if errors.is_empty() { Ok(out) } else { Err(errors.join("; ")) }
 }
 
+pub const WHISKER_RC: &str = "/etc/xdg/xfce4/panel/whiskermenu-2.rc";
+/// Always pinned in the start menu (first). Keep in sync with image/.../whiskermenu-2.rc.
+const BASE_FAVORITES: &[&str] = &[
+    "firefox-esr.desktop",
+    "ai.storyteller.wordcraft.desktop",
+    "ai.storyteller.gridcraft.desktop",
+    "ai.storyteller.deckcraft.desktop",
+    "thunar.desktop",
+    "org.xfce.thunar.desktop",
+    "org.xfce.mousepad.desktop",
+    "org.xfce.ristretto.desktop",
+    "org.xfce.screenshooter.desktop",
+    "xfce4-screenshooter.desktop",
+];
+
+/// Pin the catalog apps of this device in the start menu (after the base apps).
+/// Flatpak exports each app as `<ref>.desktop`.
+pub fn start_menu(p: &mut Platform, m: &Manifest) -> Result<Vec<String>, String> {
+    let Some(current) = p.read(WHISKER_RC) else { return Ok(vec![]) };
+    let mut favs: Vec<String> = BASE_FAVORITES.iter().map(|s| s.to_string()).collect();
+    favs.extend(m.apps.iter().filter(|a| valid_ref(&a.flatpak_ref)).map(|a| format!("{}.desktop", a.flatpak_ref)));
+    let line = format!("favorites={}", favs.join(","));
+    let mut found = false;
+    let mut out: Vec<String> = current
+        .lines()
+        .map(|l| {
+            if l.starts_with("favorites=") {
+                found = true;
+                line.clone()
+            } else {
+                l.to_string()
+            }
+        })
+        .collect();
+    if !found {
+        out.insert(0, line);
+    }
+    let c = p.write(WHISKER_RC, &(out.join("\n") + "\n"), 0o644)?;
+    Ok(changed(c, &format!("{} Apps angeheftet", m.apps.len())))
+}
+
 /// Device name as hostname (lowercase, a-z0-9-).
 pub fn identity(p: &mut Platform, m: &Manifest) -> Result<Vec<String>, String> {
     let host: String = m
@@ -527,6 +569,24 @@ mod tests {
         apply(&mut p3, &m3, &mut st);
         assert!(p3.log.iter().any(|l| l.contains("flatpak uninstall") && l.contains("org.gimp.GIMP")));
         assert!(st.managed_apps.is_empty());
+    }
+
+    #[test]
+    fn start_menu_pins_catalog_apps() {
+        let dir = tempfile::tempdir().unwrap();
+        let rc = dir.path().join(WHISKER_RC.trim_start_matches('/'));
+        std::fs::create_dir_all(rc.parent().unwrap()).unwrap();
+        std::fs::write(&rc, "favorites=old.desktop\nview-mode=0\n").unwrap();
+        let mut p = Platform::new(dir.path(), true);
+        let m = manifest(Settings::default(), vec!["org.gimp.GIMP"]);
+        start_menu(&mut p, &m).unwrap();
+        let s = std::fs::read_to_string(&rc).unwrap();
+        assert!(s.starts_with("favorites=firefox-esr.desktop,"));
+        assert!(s.contains(",org.gimp.GIMP.desktop\n"));
+        assert!(s.contains("view-mode=0"));
+        // no whisker config on the system: nothing to do
+        let empty = tempfile::tempdir().unwrap();
+        assert!(start_menu(&mut Platform::new(empty.path(), true), &m).unwrap().is_empty());
     }
 
     #[test]

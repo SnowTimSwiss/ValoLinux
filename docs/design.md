@@ -30,7 +30,7 @@ Alle Grafiken erzeugt `tools/make-branding.py` reproduzierbar (fester Zufallswer
 ## Desktop (XFCE, von Windows inspiriert)
 Ziel: Kinder kennen Windows, also soll sich alles vertraut anfühlen, ohne Windows zu kopieren.
 - Taskleiste unten, hell und leicht transparent, Startknopf und angeheftete Apps links, Uhr/Systembereich rechts; aktive App mit Amber-Strich.
-- Startmenü: Raster mit angehefteten Apps, Kategorien als Symbolleiste oben, Suche und Ein/Aus unten.
+- Startmenü: nur angeheftete Apps als Raster, Suche und Ein/Aus unten, keine Kategorien (alles Weitere über die Suche). Apps aus dem Katalog heftet der Agent automatisch an.
 - Vertraute Namen: Dateien, Editor, Fotos, Task-Manager, Bildschirmfoto, Firefox, Textverarbeitung, Tabellen, Präsentation (Hook `0200-valo-app-names`).
 - Desktop: Papierkorb, Rechtsklick-Menü (Ordner/Dokument erstellen). „Dateien“ mit heller Seitenleiste und Symbolansicht.
 - Fensterdesign „ValoLinux“ (`usr/share/themes/ValoLinux/xfwm4`, erzeugt mit `tools/make-xfwm-theme.py`): weisse Titelleiste, breite flache Knöpfe, Schliessen rot beim Darüberfahren.
