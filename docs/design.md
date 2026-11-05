@@ -32,6 +32,8 @@ Ziel: Kinder kennen Windows, also soll sich alles vertraut anfühlen, ohne Windo
 - Taskleiste unten, hell und leicht transparent, Startknopf und angeheftete Apps links, Uhr/Systembereich rechts; aktive App mit Amber-Strich.
 - Startmenü: nur angeheftete Apps als Raster, Suche und Ein/Aus unten, keine Kategorien (alles Weitere über die Suche). Apps aus dem Katalog heftet der Agent automatisch an.
 - Vertraute Namen: Dateien, Editor, Fotos, Task-Manager, Bildschirmfoto, Firefox, Textverarbeitung, Tabellen, Präsentation (Hook `0200-valo-app-names`).
+- Schüler/innen (Konto `valo`, ohne Recht „Persönliche Einstellungen ändern“): Startmenü ohne Benutzername, nur Sperren und Ausschalten; Einstellungs-Apps und Terminal sind in Menü und Suche ausgeblendet; im Desktop-Rechtsklick zeigen „Starter/Link erstellen“ und „Desktop-Einstellungen“ nur einen Hinweis (xfdesktop kann einzelne Einträge nicht ausblenden).
+- Admin (`valoadmin`) und Lehrpersonen mit dem Recht: volles Startmenü mit Neustart, Abmelden, Einstellungen.
 - Desktop: Papierkorb, Rechtsklick-Menü (Ordner/Dokument erstellen). „Dateien“ mit heller Seitenleiste und Symbolansicht.
 - Fensterdesign „ValoLinux“ (`usr/share/themes/ValoLinux/xfwm4`, erzeugt mit `tools/make-xfwm-theme.py`): weisse Titelleiste, breite flache Knöpfe, Schliessen rot beim Darüberfahren.
 - GTK: Arc (hell), Symbole: Papirus-Light, Schrift: Inter 10. Kleine CSS-Anpassungen in `usr/share/valolinux/gtk.css`.

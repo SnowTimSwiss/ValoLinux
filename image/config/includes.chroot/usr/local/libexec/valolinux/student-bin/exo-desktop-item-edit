@@ -1,0 +1,4 @@
+#!/bin/sh
+# Shadows the real tool for student sessions (desktop right-click menu items).
+zenity --info --title=ValoLinux --text="Diese Funktion ist auf diesem Gerät nicht verfügbar." 2>/dev/null
+exit 0

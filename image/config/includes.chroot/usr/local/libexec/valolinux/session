@@ -2,14 +2,47 @@
 # ValoLinux X session: XFCE plus the ValoLinux helpers.
 LOG="${XDG_CACHE_HOME:-$HOME/.cache}/valolinux-session.log"
 mkdir -p "$(dirname "$LOG")"
-/usr/local/libexec/valolinux/adoption-notice >>"$LOG" 2>&1 &
-( sleep 3; /usr/local/libexec/valolinux/xfce-setup ) >>"$LOG" 2>&1 &
+
+# Students (kiosk user "valo") get a simplified desktop unless the server allows
+# personal settings; everyone else (e.g. valoadmin) gets the full one.
+ME=$(id -un)
+STUDENT=no
+if [ "$ME" = valo ] && ! grep -q '"allow_user_settings": *true' /etc/valolinux/permissions.json 2>/dev/null; then
+    STUDENT=yes
+fi
+
 # Defaults that XFCE only reads from the user's own config (home is recreated at logout):
 #  - pinned taskbar apps (panel launchers), - CSS tweaks for the light taskbar
-mkdir -p "$HOME/.config/xfce4/panel" "$HOME/.config/gtk-3.0"
+mkdir -p "$HOME/.config/xfce4/panel" "$HOME/.config/gtk-3.0" "$HOME/.local/share/applications"
 for d in /etc/xdg/xfce4/panel/launcher-*; do
     [ -d "$d" ] && [ ! -e "$HOME/.config/xfce4/panel/$(basename "$d")" ] && cp -r "$d" "$HOME/.config/xfce4/panel/"
 done
 [ -e "$HOME/.config/gtk-3.0/gtk.css" ] || cp /usr/share/valolinux/gtk.css "$HOME/.config/gtk-3.0/gtk.css"
 
+if [ "$STUDENT" = yes ]; then
+    # hide settings apps and the terminal from menu and search
+    for f in /usr/share/applications/*.desktop /var/lib/flatpak/exports/share/applications/*.desktop; do
+        [ -f "$f" ] || continue
+        id=$(basename "$f")
+        case "$id" in pavucontrol.desktop|org.pulseaudio.pavucontrol.desktop) continue ;; esac
+        if grep -q -E '^Categories=.*(Settings|X-XFCE-SettingsDialog|TerminalEmulator|PackageManager)' "$f"; then
+            printf '[Desktop Entry]\n# valolinux-hidden\nType=Application\nName=%s\nHidden=true\n' "$id" > "$HOME/.local/share/applications/$id"
+        fi
+    done
+    # desktop right-click: "create launcher/link", "desktop settings" do nothing
+    PATH="/usr/local/libexec/valolinux/student-bin:$PATH"
+    export PATH
+else
+    # undo hiding from an earlier student session (home mode "keep")
+    grep -l '^# valolinux-hidden' "$HOME"/.local/share/applications/*.desktop 2>/dev/null | xargs -r rm -f
+    # full start menu: restart, log out, settings, user name
+    sed -e 's/^show-command-restart=.*/show-command-restart=true/' \
+        -e 's/^show-command-logoutuser=.*/show-command-logoutuser=true/' \
+        -e 's/^show-command-settings=.*/show-command-settings=true/' \
+        -e 's/^profile-shape=.*/profile-shape=0/' \
+        /etc/xdg/xfce4/panel/whiskermenu-2.rc > "$HOME/.config/xfce4/panel/whiskermenu-2.rc"
+fi
+
+/usr/local/libexec/valolinux/adoption-notice >>"$LOG" 2>&1 &
+( sleep 3; /usr/local/libexec/valolinux/xfce-setup ) >>"$LOG" 2>&1 &
 exec startxfce4
