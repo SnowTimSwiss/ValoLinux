@@ -42,7 +42,11 @@ impl Platform {
         let tmp = full.with_extension("valo-tmp");
         std::fs::write(&tmp, content).map_err(|e| format!("write {}: {e}", full.display()))?;
         set_mode(&tmp, mode);
-        std::fs::rename(&tmp, &full).map_err(|e| format!("rename {}: {e}", full.display()))?;
+        if let Err(e) = std::fs::rename(&tmp, &full) {
+            // e.g. bind-mounted files (/etc/hostname in containers): write in place
+            let _ = std::fs::remove_file(&tmp);
+            std::fs::write(&full, content).map_err(|e2| format!("write {}: {e} / {e2}", full.display()))?;
+        }
         self.log.push(format!("wrote {p}"));
         Ok(true)
     }
@@ -87,6 +91,15 @@ impl Platform {
             let err = String::from_utf8_lossy(&out.stderr);
             Err(format!("{line}: {}", err.trim().lines().last().unwrap_or("failed")))
         }
+    }
+
+    /// Output of a read-only query command; None in dry-run or on failure.
+    pub fn query(&mut self, cmd: &str, args: &[&str]) -> Option<String> {
+        if !self.execute {
+            return None;
+        }
+        let out = Command::new(cmd).args(args).output().ok()?;
+        out.status.success().then(|| String::from_utf8_lossy(&out.stdout).to_string())
     }
 
     /// Run a command whose failure just means "no" (e.g. `id user`).

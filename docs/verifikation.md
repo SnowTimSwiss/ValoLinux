@@ -18,3 +18,4 @@ Ergebnisse hier eintragen (Datum, Methode, Resultat). Bis dahin gilt alles als *
 | Roaming-Home (Nextcloud-Mount vs. Sync) Praxistest | offen | siehe home-und-konten.md |
 | Firefox-Policies `ManagedBookmarks`, `WebsiteFilter` (Sperr-/Positivliste), `ExtensionSettings` `*`=blocked: Wirkung in Firefox ESR prüfen; blockiert die Positivliste die erzwungene uBlock-Installation? | offen | Agent erzeugt sie, siehe `agent/src/apply.rs` |
 | Ecosia-Suchparameter / Family-Friendly | offen | derzeit nur Standard-Suche |
+| Agent auf echtem Debian trixie (Container `debian:trixie-slim`) | teilweise geprüft 2026-11-05 | Tastatur, Zeitzone, Firefox-Richtlinien, polkit-Regel, Hintergrund, `valoadmin` anlegen, Passwort-Hash (mit `crypt` geprüft), Hostname: ok. `locale-gen` und `flatpak` fehlten im Container (im ISO enthalten), nicht geprüft. Gefundener Fehler: Passwort-Hash mit zu langem Salt (behoben, alte Hashes werden beim Serverstart neu berechnet). |

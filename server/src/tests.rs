@@ -506,3 +506,14 @@ async fn wallpaper_upload_and_manifest() {
         assert_eq!(send(&s, get(page, &cookie)).await.0, StatusCode::OK);
     }
 }
+
+#[test]
+fn old_long_salt_hashes_are_fixed() {
+    let db = Db::open_in_memory().unwrap();
+    let d = db.upsert_enrolling_device("k", || "CODE00".into(), "h", "", "", "").unwrap();
+    db.adopt(d.id, "pc", "student", None, "pw-1", "$6$rounds=5000$Kq6BZGXHhVTrtdS5Yd/YW/$abc").unwrap();
+    assert_eq!(db.fix_admin_hashes(crate::util::crypt_sha512).unwrap(), 1);
+    let h = db.device(d.id).unwrap().unwrap().admin_password_hash.unwrap();
+    assert_eq!(h.split('$').nth(3).unwrap().len(), 16);
+    assert_eq!(db.fix_admin_hashes(crate::util::crypt_sha512).unwrap(), 0, "idempotent");
+}

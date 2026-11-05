@@ -432,6 +432,30 @@ impl Db {
         Ok(())
     }
 
+    /// Re-hash device admin passwords whose crypt salt is longer than 16 chars
+    /// (written by version 0.1.0, rejected by glibc). The password stays the same.
+    pub fn fix_admin_hashes(&self, hasher: impl Fn(&str) -> String) -> Result<usize> {
+        let rows: Vec<(i64, String, String)> = {
+            let c = self.c();
+            let mut st = c.prepare(
+                "SELECT id, admin_password, admin_password_hash FROM devices \
+                 WHERE admin_password IS NOT NULL AND admin_password_hash IS NOT NULL",
+            )?;
+            st.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?.collect::<Result<_>>()?
+        };
+        let mut fixed = 0;
+        for (id, pw, hash) in rows {
+            let parts: Vec<&str> = hash.split('$').collect();
+            // "$6$rounds=N$salt$hash" or "$6$salt$hash"
+            let salt_part = if parts.get(2).is_some_and(|p| p.starts_with("rounds=")) { parts.get(3) } else { parts.get(2) };
+            if salt_part.is_some_and(|s| s.len() > 16) {
+                self.set_admin_password(id, &pw, &hasher(&pw))?;
+                fixed += 1;
+            }
+        }
+        Ok(fixed)
+    }
+
     pub fn set_admin_password(&self, id: i64, password: &str, hash: &str) -> Result<()> {
         self.c().execute(
             "UPDATE devices SET admin_password = ?2, admin_password_hash = ?3 WHERE id = ?1",

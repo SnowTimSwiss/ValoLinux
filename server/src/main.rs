@@ -105,6 +105,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let db = db::Db::open(&data_dir.join("valo.db"))?;
     // the database holds per-device admin passwords: owner only
     restrict_data_dir(&data_dir);
+    let fixed = db.fix_admin_hashes(util::crypt_sha512)?;
+    if fixed > 0 {
+        tracing::info!("re-hashed {fixed} device admin passwords (salt length fix)");
+    }
     tracing::info!("server public key: {}", key.public_key());
 
     let assets_dir = data_dir.join("assets");

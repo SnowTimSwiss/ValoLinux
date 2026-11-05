@@ -145,7 +145,12 @@ pub fn locale(p: &mut Platform, s: &Settings) -> Result<Vec<String>, String> {
         lines.push(gen_line);
     }
     let gen_changed = p.write("/etc/locale.gen", &(lines.join("\n") + "\n"), 0o644)?;
-    if gen_changed {
+    // also regenerate if an earlier run failed: is the locale really compiled?
+    let compiled = format!("{base}.utf8").to_lowercase();
+    let missing = p
+        .query("localedef", &["--list-archive"])
+        .is_some_and(|list| !list.to_lowercase().lines().any(|l| l.trim() == compiled));
+    if gen_changed || missing {
         p.run("locale-gen", &[])?;
     }
     let def = p.write("/etc/default/locale", &format!("LANG={loc}\n"), 0o644)?;

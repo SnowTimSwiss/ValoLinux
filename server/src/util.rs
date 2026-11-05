@@ -41,8 +41,15 @@ pub fn admin_password() -> String {
 
 /// crypt(3) SHA-512 hash usable with `usermod -p`.
 pub fn crypt_sha512(password: &str) -> String {
+    crypt_sha512_with_salt(password, &random_bytes::<12>())
+}
+
+/// SHA-512-crypt uses at most 16 salt characters. sha-crypt's default salt is
+/// longer and gets truncated inside the hash but not in the string, so glibc
+/// would produce a different string and logins fail. 12 bytes = exactly 16 chars.
+fn crypt_sha512_with_salt(password: &str, salt: &[u8; 12]) -> String {
     use sha_crypt::{PasswordHasher, ShaCrypt};
-    ShaCrypt::default().hash_password(password.as_bytes()).expect("sha-crypt").to_string()
+    ShaCrypt::default().hash_password_with_salt(password.as_bytes(), salt).expect("sha-crypt").to_string()
 }
 
 /// Parsed `application/x-www-form-urlencoded` body (keeps repeated keys).
@@ -97,7 +104,17 @@ mod tests {
         assert_eq!(format_code("K7M2QX"), "K7M-2QX");
         let p = admin_password();
         assert_eq!(p.len(), 19);
-        assert!(crypt_sha512(&p).starts_with("$6$"));
+        let h = crypt_sha512(&p);
+        assert!(h.starts_with("$6$"));
+        let salt = h.split('$').nth(3).unwrap();
+        assert_eq!(salt.len(), 16, "{h}");
+    }
+
+    #[test]
+    fn crypt_matches_glibc() {
+        // reference: `openssl passwd -6 -salt '.2U.1EE/4Q.07ck0' Test-1234` (identical to glibc crypt)
+        let h = crypt_sha512_with_salt("Test-1234", &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+        assert_eq!(h.replacen("rounds=5000$", "", 1), "$6$.2U.1EE/4Q.07ck0$1Enw.Y8y5cg05yy4TQ.0IdC1Wvg550qmJzY2XwZlfr9BgfSOh4litFDhQZSdTL1yM66xX4BcDNOlBZKiD6MTi0");
     }
 
     #[test]
