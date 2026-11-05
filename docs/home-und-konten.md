@@ -53,6 +53,19 @@ Alle Einstellungen gelten pro **Rolle**, **Gruppe/Klasse** oder **Gerät**; spez
 
 Wichtig: Der Gerätezustand bleibt über das Manifest steuerbar, Konten und Dateien sind davon getrennt.
 
+## Vorschlag für die Umsetzung (Stand 2026-11-05, noch nicht gebaut)
+Die Verwaltung (Server, Agent, signierte Manifeste) steht. Darauf aufbauend gibt es zwei realistische Wege:
+
+| | A: Konten in der Web-UI, auf Geräte synchronisiert | B: Anbindung an bestehende Schulkonten (OIDC/LDAP, z. B. Microsoft 365, Google) |
+|---|---|---|
+| Wie | Admin legt Konten an (einzeln/CSV pro Klasse). Server schickt jedem Gerät die Konten, die dort erlaubt sind (z. B. seine Klasse) mit Passwort-Hash. Agent legt lokale Benutzer an. | Gerät prüft das Passwort bei der Schul-Anmeldung (z. B. `sssd`, OIDC-PAM-Modul). |
+| Offline | funktioniert (Hashes liegen lokal) | nur mit Cache |
+| Aufwand | klein, alles schon da (Manifest, Agent, UI) | gross, abhängig vom Anbieter |
+| Sicherheit | Passwort-Hashes liegen auf jedem Gerät der Klasse (nur für root lesbar). Schwache Kinderpasswörter sind knackbar, wenn jemand Root auf einem Gerät hat. | keine Hashes auf Geräten |
+| Passwort zurücksetzen | in der Web-UI, auch durch Lehrperson (Recht einstellbar) | beim Anbieter |
+
+**Empfehlung:** A als Start, aber nur Konten der eigenen Klasse/Gruppe pro Gerät, Mindestlänge, und Dateien nicht lokal sondern in der Cloud (Nextcloud). B später, falls die Schule schon zentrale Konten hat.
+
 ## Offene Fragen an dich
 1. Gibt es schon einen Nextcloud-Server/Verzeichnisdienst in der Schule, oder soll die Web-UI die Konten selbst führen?
 2. Datenschutz: Schülerdateien liegen dann zentral – wo wird gehostet (Schulhaus, Gemeinde, extern) und wer darf zustimmen? (Rechtlich nicht von mir geprüft.)
