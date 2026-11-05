@@ -942,6 +942,10 @@ fn field_input(f: &Field, current: Option<&Value>, parent: Option<&Value>, from:
                     Kind::Text { placeholder } => {
                         input name=(f.key) value=(cur_str) placeholder={"Erben: " (parent_txt)} title=(placeholder);
                     }
+                    Kind::Lines { placeholder } => {
+                        @let text = current.and_then(|v| v.as_array()).map(|a| a.iter().filter_map(|x| x.as_str()).collect::<Vec<_>>().join("\n")).unwrap_or_default();
+                        textarea name=(f.key) rows="4" placeholder={"Leer = erben (" (parent_txt) ")\n" (placeholder)} { (text) }
+                    }
                     Kind::Bool => {
                         @let b = current.and_then(|v| v.as_bool());
                         div.segmented {

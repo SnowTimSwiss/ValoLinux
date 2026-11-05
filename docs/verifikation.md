@@ -16,3 +16,5 @@ Ergebnisse hier eintragen (Datum, Methode, Resultat). Bis dahin gilt alles als *
 | bootc auf Debian als Alternative zum Eigenbau | offen | |
 | Flatpak: Speicher/RAM der Runtimes, eigener signierter Remote, Offline-Verhalten | offen | |
 | Roaming-Home (Nextcloud-Mount vs. Sync) Praxistest | offen | siehe home-und-konten.md |
+| Firefox-Policies `ManagedBookmarks`, `WebsiteFilter` (Sperr-/Positivliste), `ExtensionSettings` `*`=blocked: Wirkung in Firefox ESR prüfen; blockiert die Positivliste die erzwungene uBlock-Installation? | offen | Agent erzeugt sie, siehe `agent/src/apply.rs` |
+| Ecosia-Suchparameter / Family-Friendly | offen | derzeit nur Standard-Suche |

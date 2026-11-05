@@ -207,7 +207,69 @@ pub fn firefox_policies(s: &Settings) -> Value {
         },
     );
     policies["ExtensionSettings"] = Value::Object(ext);
+
+    let bookmarks: Vec<Value> = s
+        .browser_bookmarks
+        .iter()
+        .flatten()
+        .filter_map(|line| {
+            let (name, url) = line.split_once('|')?;
+            let (name, url) = (name.trim(), url.trim());
+            (!name.is_empty() && is_web_url(url)).then(|| json!({ "name": name, "url": url }))
+        })
+        .collect();
+    if !bookmarks.is_empty() {
+        let mut list = vec![json!({ "toplevel_name": "Schule" })];
+        list.extend(bookmarks);
+        policies["ManagedBookmarks"] = Value::Array(list);
+        policies["DisplayBookmarksToolbar"] = json!("always");
+    }
+
+    let mut sites: Vec<String> = s.browser_sites.iter().flatten().filter_map(|d| clean_domain(d)).collect();
+    if s.browser_filter.as_deref() == Some("allow") {
+        // homepage and search engine must stay reachable in allow-list mode
+        let search = match s.browser_search.as_deref().unwrap_or("ecosia") {
+            "duckduckgo" => "duckduckgo.com",
+            "google" => "google.com",
+            "startpage" => "startpage.com",
+            _ => "ecosia.org",
+        };
+        sites.extend(clean_domain(&homepage));
+        sites.push(search.to_string());
+    }
+    let mut seen = std::collections::HashSet::new();
+    sites.retain(|d| seen.insert(d.clone()));
+    let patterns: Vec<String> =
+        sites.iter().flat_map(|d| [format!("*://{d}/*"), format!("*://*.{d}/*")]).collect();
+    match s.browser_filter.as_deref() {
+        Some("block") if !patterns.is_empty() => {
+            policies["WebsiteFilter"] = json!({ "Block": patterns });
+        }
+        Some("allow") => {
+            policies["WebsiteFilter"] = json!({ "Block": ["<all_urls>"], "Exceptions": patterns });
+        }
+        _ => {}
+    }
     json!({ "policies": policies })
+}
+
+fn is_web_url(u: &str) -> bool {
+    (u.starts_with("https://") || u.starts_with("http://")) && !u.contains(char::is_whitespace) && u.len() < 2000
+}
+
+/// "https://www.Example.ch/x" -> "example.ch"; None if it is not a plain domain.
+pub fn clean_domain(input: &str) -> Option<String> {
+    let mut d = input.trim().to_lowercase();
+    for prefix in ["https://", "http://"] {
+        if let Some(rest) = d.strip_prefix(prefix) {
+            d = rest.to_string();
+        }
+    }
+    let d = d.split('/').next().unwrap_or("").trim_start_matches("www.").trim_start_matches("*.").to_string();
+    let ok = d.contains('.')
+        && d.len() < 254
+        && d.split('.').all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_alphanumeric() || c == '-'));
+    ok.then_some(d)
 }
 
 pub fn firefox(p: &mut Platform, s: &Settings) -> Result<Vec<String>, String> {
@@ -441,6 +503,35 @@ mod tests {
         assert!(admin_account(&mut p, &m, &mut st).is_err());
         apps(&mut p, &m, &mut st).unwrap();
         assert_eq!(st.managed_apps, vec!["org.ok.App"]);
+    }
+
+    #[test]
+    fn firefox_filter_and_bookmarks() {
+        let s = Settings::resolve([&Settings {
+            browser_bookmarks: Some(vec![
+                "Schule | https://www.schule.ch".into(),
+                "kaputt".into(),
+                "JS | javascript:alert(1)".into(),
+            ]),
+            browser_filter: Some("allow".into()),
+            browser_sites: Some(vec!["https://www.Schule.ch/home".into(), "bad domain".into(), "edu.ch".into()]),
+            ..Default::default()
+        }]);
+        let v = firefox_policies(&s);
+        let bm = v["policies"]["ManagedBookmarks"].as_array().unwrap();
+        assert_eq!(bm.len(), 2, "toplevel + one valid bookmark");
+        assert_eq!(bm[1]["url"], "https://www.schule.ch");
+        let f = &v["policies"]["WebsiteFilter"];
+        assert_eq!(f["Block"][0], "<all_urls>");
+        assert_eq!(
+            f["Exceptions"],
+            json!(["*://schule.ch/*", "*://*.schule.ch/*", "*://edu.ch/*", "*://*.edu.ch/*",
+                   "*://ecosia.org/*", "*://*.ecosia.org/*"]),
+            "homepage + search engine added once"
+        );
+        let off = firefox_policies(&Settings::defaults());
+        assert!(off["policies"].get("WebsiteFilter").is_none());
+        assert!(off["policies"].get("ManagedBookmarks").is_none());
     }
 
     #[test]

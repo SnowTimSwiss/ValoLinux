@@ -433,3 +433,19 @@ async fn login_lockout() {
     let (_, h, _) = send(&s, login_form("admin", "correct-horse-1")).await;
     assert!(h.iter().any(|(k, _)| k == "set-cookie"));
 }
+
+#[tokio::test]
+async fn line_settings_parse() {
+    let s = state();
+    let (cookie, csrf) = login(&s).await;
+    let body = format!(
+        "csrf={csrf}&browser_filter=allow&browser_sites=schule.ch%0D%0A%0D%0A++edu.ch++&browser_bookmarks=&apps_mode=inherit"
+    );
+    send(&s, form("/settings/role:student", &cookie, &body)).await;
+    let p = s.db.policy("role:student").unwrap();
+    assert_eq!(p.browser_filter.as_deref(), Some("allow"));
+    assert_eq!(p.browser_sites, Some(vec!["schule.ch".to_string(), "edu.ch".to_string()]));
+    assert_eq!(p.browser_bookmarks, None, "empty textarea inherits");
+    let (_, _, page) = send(&s, get("/settings/role:student", &cookie)).await;
+    assert!(page.contains("schule.ch\nedu.ch"));
+}

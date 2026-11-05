@@ -47,7 +47,7 @@ Ebenen, die spätere gewinnt: **Standard → Global → Rolle → Gruppe → Ger
 | Sprache | `/etc/locale.gen` + `locale-gen`, `/etc/default/locale` |
 | Zeitzone | `/etc/timezone`, `/etc/localtime` |
 | Persönlicher Ordner | `/etc/valolinux/home-mode`, LightDM löscht `/home/valo` nach dem Abmelden |
-| Browser | `/etc/firefox/policies/policies.json` (Startseite, Suchmaschine, uBlock, Erweiterungen) |
+| Browser | `/etc/firefox/policies/policies.json` (Startseite, Suchmaschine, uBlock, Erweiterungen, Lesezeichen, Webfilter mit Sperrliste oder „nur erlaubte Seiten“) |
 | Apps | Flatpak von Flathub, nur aus dem Katalog; der Agent entfernt nur, was er selbst installiert hat |
 | Rechte | `/etc/valolinux/permissions.json`, polkit-Regel für Flatpak |
 | Admin-Konto | Benutzer `valoadmin`, Passwort pro Gerät zufällig (Web-UI: Gerät → Passwort anzeigen) |
@@ -89,3 +89,4 @@ Der Server-Test spielt den ganzen Ablauf durch (Setup, Login, Anmeldung, Adoptio
 ![Geräteliste mit Mehrfachauswahl](img/ui/17-devices-bulk.png)
 ![Fernaktionen](img/ui/15-device-actions.png)
 ![Gruppen](img/ui/16-groups.png)
+![Browser: Lesezeichen und Webfilter](img/ui/18-browser-settings.png)

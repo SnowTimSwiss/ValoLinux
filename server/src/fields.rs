@@ -7,6 +7,8 @@ use valo_proto::Settings;
 pub enum Kind {
     Choice(&'static [(&'static str, &'static str)]),
     Text { placeholder: &'static str },
+    /// One value per line (textarea).
+    Lines { placeholder: &'static str },
     Bool,
     Apps,
 }
@@ -93,6 +95,24 @@ pub static SECTIONS: &[Section] = &[
             },
             Field { key: "browser_adblock", label: "Werbeblocker (uBlock Origin)", help: "", kind: Kind::Bool },
             Field {
+                key: "browser_bookmarks",
+                label: "Lesezeichen",
+                help: "Eine Zeile pro Lesezeichen: Name | Adresse. Erscheinen fest in der Lesezeichenleiste.",
+                kind: Kind::Lines { placeholder: "Schulwebsite | https://www.schule.ch\nLernplattform | https://…" },
+            },
+            Field {
+                key: "browser_filter",
+                label: "Webfilter",
+                help: "Sperrliste: die Seiten unten sind gesperrt. Nur erlaubte Seiten: nur die Seiten unten plus Startseite und Suchmaschine.",
+                kind: Kind::Choice(&[("off", "Aus"), ("block", "Sperrliste"), ("allow", "Nur erlaubte Seiten")]),
+            },
+            Field {
+                key: "browser_sites",
+                label: "Seiten für den Webfilter",
+                help: "Eine Domain pro Zeile, Unterseiten sind eingeschlossen (z. B. tiktok.com).",
+                kind: Kind::Lines { placeholder: "tiktok.com\nbeispiel.ch" },
+            },
+            Field {
                 key: "browser_allow_addons",
                 label: "Eigene Erweiterungen erlaubt",
                 help: "Benutzer dürfen selbst Firefox-Erweiterungen installieren",
@@ -157,6 +177,12 @@ pub fn display(field: &Field, v: Option<&Value>, catalog: &[crate::db::CatalogEn
         }
         (Kind::Bool, Value::Bool(b)) => if *b { "Ja" } else { "Nein" }.into(),
         (Kind::Apps, Value::Array(a)) if a.is_empty() => "keine zusätzlichen".into(),
+        (Kind::Lines { .. }, Value::Array(a)) if a.is_empty() => "keine".into(),
+        (Kind::Lines { .. }, Value::Array(a)) => {
+            let first: Vec<&str> = a.iter().filter_map(|x| x.as_str()).take(3).collect();
+            let more = if a.len() > 3 { format!(" (+{})", a.len() - 3) } else { String::new() };
+            format!("{}{more}", first.join(", "))
+        }
         (Kind::Apps, Value::Array(a)) => a
             .iter()
             .filter_map(|x| x.as_str())
@@ -176,6 +202,16 @@ pub fn parse_form(form: &crate::util::FormData, catalog: &[crate::db::CatalogEnt
         let value = match &f.kind {
             Kind::Choice(opts) => opts.iter().any(|(k, _)| *k == v).then(|| Value::String(v.clone())),
             Kind::Text { .. } => (!v.is_empty()).then(|| Value::String(v.chars().take(500).collect())),
+            Kind::Lines { .. } => {
+                let lines: Vec<Value> = v
+                    .lines()
+                    .map(str::trim)
+                    .filter(|l| !l.is_empty())
+                    .take(200)
+                    .map(|l| Value::String(l.chars().take(300).collect()))
+                    .collect();
+                (!lines.is_empty()).then_some(Value::Array(lines))
+            }
             Kind::Bool => match v.as_str() {
                 "true" => Some(Value::Bool(true)),
                 "false" => Some(Value::Bool(false)),

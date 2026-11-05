@@ -51,6 +51,15 @@ pub struct Settings {
     pub browser_search: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub browser_adblock: Option<bool>,
+    /// Bookmarks in the toolbar, one per entry: "Name | https://…"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub browser_bookmarks: Option<Vec<String>>,
+    /// "off" | "block" (block listed sites) | "allow" (only listed sites)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub browser_filter: Option<String>,
+    /// Domains for the filter, e.g. "tiktok.com"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub browser_sites: Option<Vec<String>>,
     /// May users install Firefox add-ons themselves?
     #[serde(skip_serializing_if = "Option::is_none")]
     pub browser_allow_addons: Option<bool>,
@@ -82,6 +91,9 @@ impl Settings {
             browser_homepage: Some("https://www.ecosia.org".into()),
             browser_search: Some("ecosia".into()),
             browser_adblock: Some(true),
+            browser_bookmarks: Some(vec![]),
+            browser_filter: Some("off".into()),
+            browser_sites: Some(vec![]),
             browser_allow_addons: Some(false),
             apps: Some(vec![]),
             allow_app_install: Some(false),
@@ -104,6 +116,9 @@ impl Settings {
             browser_homepage,
             browser_search,
             browser_adblock,
+            browser_bookmarks,
+            browser_filter,
+            browser_sites,
             browser_allow_addons,
             apps,
             allow_app_install,
