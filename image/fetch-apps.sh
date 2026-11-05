@@ -3,8 +3,7 @@
 # DRAFT, UNTESTED. Release asset names are taken from the upstream READMEs, not verified:
 #   WordCraft: wordcraft-<ver>-linux-x86_64.deb (documented in its README)
 #   GridCraft/DeckCraft: assumed to follow the same pattern -> the script fails loudly if not.
-#   FlameWM: release .deb if present, else built from source (./scripts/build-deb).
-# Needs: gh (with GH_TOKEN) ; for the FlameWM source fallback: git, rust toolchain, build deps.
+# Needs: gh (with GH_TOKEN) and dpkg-deb.
 set -euo pipefail
 dest="${1:?usage: fetch-apps.sh <dest-dir>}"
 mkdir -p "$dest"
@@ -16,16 +15,6 @@ for app in wordcraft gridcraft deckcraft; do
     || { echo "ERROR: no x86_64 .deb found in latest release of storytold/$app"; exit 1; }
 done
 
-echo "== flamewm"
-if ! gh release download --repo ArkFlame/FlameWM --pattern 'flamewm_*_amd64.deb' --dir "$dest" --clobber 2>/dev/null; then
-  echo "No FlameWM release .deb, building from source"
-  tmp="$(mktemp -d)"
-  tag="$(gh release view --repo ArkFlame/FlameWM --json tagName --jq .tagName 2>/dev/null || echo main)"
-  git clone --depth 1 --branch "$tag" https://github.com/ArkFlame/FlameWM "$tmp/flamewm" \
-    || git clone --depth 1 https://github.com/ArkFlame/FlameWM "$tmp/flamewm"
-  ( cd "$tmp/flamewm" && ./scripts/install-deps-ubuntu.sh && ./scripts/build-deb )
-  cp "$tmp"/flamewm/.target/dist/flamewm_*_amd64.deb "$dest/"
-fi
 # live-build only picks up *_<arch>.deb / *_all.deb from packages.chroot, so rename
 # e.g. wordcraft-0.15.2-linux-x86_64.deb -> wordcraft_0.15.2_amd64.deb
 for f in "$dest"/*.deb; do

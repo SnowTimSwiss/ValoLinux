@@ -9,7 +9,7 @@ Stand: 2026-11-04
 | Build | GitHub Actions, Freigabe nach Test auf Testgerät | Einzelentwickler, Automatisierung |
 | Verwaltung | Web-UI in Docker, Geräte holen per Pull | Keine eingehenden Verbindungen zu Geräten |
 | Transport | iroh (Rust, QUIC) | Ausdrücklich für den Test gewünscht |
-| Desktop | FlameWM (X11) | Siehe Verifikation: noch nicht produktionsreif |
+| Desktop | **XFCE** (ab 0.0.4, vorher FlameWM) | FlameWM ist Vorabversion (Sperre, Autostart, Anmeldung offen). XFCE ist stabil, leicht, hat einen Kiosk-Modus und lässt sich ähnlich wie Windows einrichten. Entscheidung 2026-11-05 |
 | Browser | Firefox ESR, `policies.json`, Adblocker vorinstalliert, Ecosia (Family-Friendly-Modus) als Standardsuche | Zentrale Steuerung |
 | Office | ArtCraft-Suite, LibreOffice/OnlyOffice als Fallback im Katalog | ArtCraft ist Pre-Alpha |
 | Software-Katalog | **Flatpak als Standard** (eigener, signierter Remote) | Distro-neutral, passt zum Rückweg; Speicher-/RAM-Kosten der Runtimes messen |

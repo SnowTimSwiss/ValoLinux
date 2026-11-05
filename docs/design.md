@@ -27,6 +27,15 @@ Alle Grafiken erzeugt `tools/make-branding.py` reproduzierbar (fester Zufallswer
 - `usr/share/backgrounds/valolinux-splash.png`: Boot-Menü, 640×480
 - `usr/share/pixmaps/valolinux-logo.png`: Logo 256×256 (Greeter-Benutzerbild)
 
+## Desktop (XFCE, ähnlich Windows 11)
+- Taskleiste unten, hell und leicht transparent, Start und Apps zentriert; aktive App mit Amber-Strich.
+- Fensterdesign „ValoLinux“ (`usr/share/themes/ValoLinux/xfwm4`, erzeugt mit `tools/make-xfwm-theme.py`): weisse Titelleiste, breite flache Knöpfe, Schliessen rot beim Darüberfahren.
+- GTK: Arc (hell), Symbole: Papirus-Light, Schrift: Inter 10. Kleine CSS-Anpassungen in `usr/share/valolinux/gtk.css`.
+- Vorgaben: `etc/xdg/xfce4/` (Panel, Whisker-Menü, Fenster, Schriften), beim Anmelden ergänzt durch `usr/local/libexec/valolinux/session` und `xfce-setup` (Hintergrund pro Bildschirm, Tastenkürzel).
+
+![Desktop](img/xfce-desktop.png)
+![Startmenü](img/xfce-menu.png)
+
 ## Greeter (entschieden: LightDM GTK Greeter)
 Eigenes GTK-Theme **ValoLinux** (`usr/share/themes/ValoLinux/gtk-3.0/gtk.css`), baut auf dem in GTK eingebauten Adwaita dark auf und gestaltet nur den Greeter:
 - Login-Karte: dunkles, halbtransparentes Glas, runde Ecken, Logo als Benutzerbild

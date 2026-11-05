@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Textverarbeitung
+Exec=wordcraft %F
+Icon=ai.storyteller.wordcraft
+StartupNotify=true

@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Tabellen
+Exec=gridcraft %F
+Icon=ai.storyteller.gridcraft
+StartupNotify=true

@@ -1,41 +1,76 @@
-# Minimal live system. Recommends are disabled (apt-recommends false).
-firefox-esr
-lightdm
-lightdm-gtk-greeter
+# Minimal live system. Recommends are disabled (apt-recommends false),
+# so everything needed is listed explicitly. build.sh checks that each name exists.
+
+# --- base, boot, locale ---
+live-boot
+live-config
+live-config-systemd
+sudo
+adduser
+procps
+locales
+keyboard-configuration
+tzdata
+systemd-zram-generator
+firmware-linux
+
+# --- display + login ---
 xserver-xorg-core
 xserver-xorg-input-libinput
 xserver-xorg-video-all
 xinit
 dbus-x11
-polkitd
-flatpak
-systemd-zram-generator
-network-manager
+dbus-user-session
+lightdm
+lightdm-gtk-greeter
+mesa-vulkan-drivers
+libgl1-mesa-dri
+
+# --- desktop: XFCE, set up Windows-like (see /etc/xdg/xfce4) ---
+xfce4-session
+xfwm4
+xfce4-panel
+xfdesktop4
+xfce4-settings
+xfconf
+xfce4-whiskermenu-plugin
+xfce4-pulseaudio-plugin
+xfce4-notifyd
+xfce4-power-manager
+xfce4-power-manager-plugins
+xfce4-taskmanager
+xfce4-screenshooter
+xfce4-terminal
+thunar
+thunar-volman
+gvfs
+udisks2
+mousepad
+ristretto
+arc-theme
+papirus-icon-theme
+adwaita-icon-theme
 fonts-dejavu-core
 fonts-inter
 fonts-noto-core
-firmware-linux
-adwaita-icon-theme
+fonts-noto-color-emoji
 
-mesa-vulkan-drivers
-libgl1-mesa-dri
-sudo
-adduser
-live-boot
-live-config
-live-config-systemd
-# German/Swiss locale and keyboard (set via live-config boot parameters)
-locales
-keyboard-configuration
-tzdata
-# Fallback session if FlameWM does not start: pick "Openbox" in the greeter, right-click for a menu
-openbox
-xterm
-# ValoLinux session helpers (adoption code dialog, fallback background)
+# --- network, sound, power ---
+network-manager
+network-manager-gnome
+pipewire-audio
+pavucontrol
+upower
+polkitd
+
+# --- apps ---
+firefox-esr
+flatpak
+
+# --- ValoLinux helpers (adoption code dialog, xrandr for wallpaper per monitor) ---
 zenity
 x11-xserver-utils
-# find the management server as valolinux.local (mDNS)
+
+# --- find the management server as valolinux.local (mDNS) ---
 avahi-daemon
 libnss-mdns
-# pgrep/pkill for the logout cleanup script
-procps

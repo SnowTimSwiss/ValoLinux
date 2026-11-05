@@ -323,6 +323,18 @@ pub fn permissions(p: &mut Platform, m: &Manifest) -> Result<Vec<String>, String
          return {result};\n    }}\n}});\n"
     );
     let b = p.write("/etc/polkit-1/rules.d/50-valolinux.rules", &rule, 0o644)?;
+    // XFCE kiosk mode: without "personal settings" only the admin may change the taskbar/session
+    let kiosk = if s.allow_user_settings.unwrap_or(false) {
+        "# Managed by valo-agent: users may customise\n[xfce4-panel]\nCustomizePanel=ALL\n".to_string()
+    } else {
+        let only = format!("%{ADMIN_USER}");
+        format!(
+            "# Managed by valo-agent: only {ADMIN_USER} may customise\n[xfce4-panel]\nCustomizePanel={only}\n\n\
+             [xfce4-session]\nCustomizeSplash={only}\nCustomizeChooser={only}\nCustomizeLogout={only}\n\
+             CustomizeCompatibility={only}\nCustomizeSecurity={only}\n"
+        )
+    };
+    let b = p.write("/etc/xdg/xfce4/kiosk/kioskrc", &kiosk, 0o644)? || b;
     Ok(changed(a || b, &format!("Rolle {}, Apps installieren: {}", m.role, if allow_install { "ja" } else { "nein" })))
 }
 
@@ -336,10 +348,10 @@ pub fn home(p: &mut Platform, s: &Settings) -> Result<Vec<String>, String> {
     Ok(changed(c, if mode == "wipe" { "beim Abmelden löschen" } else { "behalten" }))
 }
 
-pub const DEFAULT_WALLPAPER: &str = "/usr/share/backgrounds/valolinux.png";
+pub const DEFAULT_WALLPAPER: &str = "/usr/share/backgrounds/valolinux-greeter.png";
 
-/// Desktop wallpaper for new sessions (FlameWM settings in /etc/skel; the
-/// kiosk home is recreated from skel at logout when home mode is "wipe").
+/// Desktop wallpaper: the path goes to /etc/valolinux/wallpaper, which the
+/// session helper (xfce-setup) applies to every monitor at login.
 pub fn wallpaper(p: &mut Platform, s: &Settings, files: &Downloads) -> Result<Vec<String>, String> {
     let choice = s.wallpaper.clone().unwrap_or_else(|| "default".into());
     let path = if valo_proto::is_sha256(&choice) {
@@ -354,7 +366,7 @@ pub fn wallpaper(p: &mut Platform, s: &Settings, files: &Downloads) -> Result<Ve
     } else {
         DEFAULT_WALLPAPER.to_string()
     };
-    let c = p.write("/etc/skel/.config/flamewm/settings.toml", &format!("wallpaper={path}\n"), 0o644)?;
+    let c = p.write("/etc/valolinux/wallpaper", &format!("{path}\n"), 0o644)?;
     Ok(changed(c, if path == DEFAULT_WALLPAPER { "Standardbild" } else { "eigenes Bild" }))
 }
 
@@ -494,6 +506,8 @@ mod tests {
         assert_eq!(read("etc/hostname"), "zimmer-12-pc-3\n");
         assert_eq!(read("etc/valolinux/home-mode"), "wipe\n");
         assert!(read("etc/polkit-1/rules.d/50-valolinux.rules").contains("polkit.Result.NO"));
+        assert!(read("etc/xdg/xfce4/kiosk/kioskrc").contains("CustomizePanel=%valoadmin"));
+        assert_eq!(read("etc/valolinux/wallpaper"), format!("{DEFAULT_WALLPAPER}\n"));
         let ff: Value = serde_json::from_str(&read("etc/firefox/policies/policies.json")).unwrap();
         assert_eq!(ff["policies"]["SearchEngines"]["Default"], "Ecosia");
         assert_eq!(ff["policies"]["ExtensionSettings"]["*"]["installation_mode"], "blocked");
@@ -542,13 +556,13 @@ mod tests {
         assert!(wallpaper(&mut p, &s, &files).is_err(), "hash mismatch");
         files.insert(sha.clone(), img.clone());
         wallpaper(&mut p, &s, &files).unwrap();
-        let skel = std::fs::read_to_string(dir.path().join("etc/skel/.config/flamewm/settings.toml")).unwrap();
+        let conf = std::fs::read_to_string(dir.path().join("etc/valolinux/wallpaper")).unwrap();
         let target = format!("/usr/share/backgrounds/valolinux-custom-{}.png", &sha[..16]);
-        assert_eq!(skel, format!("wallpaper={target}\n"));
+        assert_eq!(conf, format!("{target}\n"));
         assert_eq!(std::fs::read(dir.path().join(target.trim_start_matches('/'))).unwrap(), img);
         wallpaper(&mut p, &Settings::defaults(), &files).unwrap();
-        let skel = std::fs::read_to_string(dir.path().join("etc/skel/.config/flamewm/settings.toml")).unwrap();
-        assert_eq!(skel, format!("wallpaper={DEFAULT_WALLPAPER}\n"));
+        let conf = std::fs::read_to_string(dir.path().join("etc/valolinux/wallpaper")).unwrap();
+        assert_eq!(conf, format!("{DEFAULT_WALLPAPER}\n"));
     }
 
     #[test]

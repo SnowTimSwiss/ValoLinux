@@ -53,7 +53,7 @@ Ebenen, die spätere gewinnt: **Standard → Global → Rolle → Gruppe → Ger
 | Apps | Flatpak von Flathub, nur aus dem Katalog; der Agent entfernt nur, was er selbst installiert hat |
 | Rechte | `/etc/valolinux/permissions.json`, polkit-Regel für Flatpak |
 | Admin-Konto | Benutzer `valoadmin`, Passwort pro Gerät zufällig (Web-UI: Gerät → Passwort anzeigen) |
-| Hintergrundbild | `/usr/share/backgrounds/valolinux-custom-*.png/jpg`, `/etc/skel/.config/flamewm/settings.toml` |
+| Hintergrundbild | `/usr/share/backgrounds/valolinux-custom-*.png/jpg`, `/etc/valolinux/wallpaper` (beim Anmelden für jeden Bildschirm gesetzt) |
 | Name | Hostname |
 
 ## Agent

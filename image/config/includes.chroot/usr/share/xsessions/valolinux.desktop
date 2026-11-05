@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
 Name=ValoLinux
-Comment=FlameWM with ValoLinux helpers (falls back to Openbox)
+Comment=ValoLinux Desktop (XFCE)
 Exec=/usr/local/libexec/valolinux/session
-DesktopNames=FlameWM
+DesktopNames=XFCE

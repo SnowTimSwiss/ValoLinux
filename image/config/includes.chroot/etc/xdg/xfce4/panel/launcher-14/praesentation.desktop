@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Präsentation
+Exec=deckcraft %F
+Icon=ai.storyteller.deckcraft
+StartupNotify=true

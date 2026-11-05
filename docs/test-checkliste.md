@@ -10,13 +10,13 @@ Zum Abhaken beim Test zuhause. Bei Problemen: Foto/Screenshot + was passiert ist
 - [ ] Bootet bis zur grafischen Oberfläche?
 
 **Anmeldung**
-- [ ] Autologin direkt in FlameWM?
+- [ ] Autologin direkt in den XFCE-Desktop (helle Taskleiste unten)?
 - [ ] Falls Anmeldemaske: `valo` / `valo` probieren. Sieht der Greeter wie in `docs/design.md` aus?
-- [ ] Falls FlameWM nicht startet: im Greeter oben die Sitzung „Openbox“ wählen und anmelden, Rechtsklick auf den Desktop öffnet ein Menü.
 - [ ] `Ctrl+Alt+F3`: Diagnose-Block über dem Login abfotografieren. Login dort mit `root` / `valo`.
 
 **Desktop**
-- [ ] Startet die Sitzung „ValoLinux“ (FlameWM)? Falls FlameWM abstürzt: kommt automatisch Openbox mit einer Meldung?
+- [ ] Startmenü (Windows-Taste): Favoriten Firefox, Textverarbeitung, Tabellen, Präsentation, Dateien? Suche nach „word“ findet die Textverarbeitung?
+- [ ] Angeheftete Apps in der Taskleiste starten? Win+L sperrt und zeigt unseren Greeter?
 - [ ] Hintergrundbild da?
 - [ ] Tastatur Schweizerdeutsch (z/y, Umlaute)? Uhrzeit korrekt (Europe/Zurich)?
 - [ ] Firefox startet, uBlock Origin ist installiert? In Firefox `about:policies` öffnen: sind die Richtlinien aktiv (Screenshot)?
@@ -24,7 +24,7 @@ Zum Abhaken beim Test zuhause. Bei Problemen: Foto/Screenshot + was passiert ist
 - [ ] Netzwerk (LAN/WLAN) geht?
 
 **Wenn Zeit bleibt**
-- [ ] `free -m` direkt nach dem Start und mit Firefox + WordCraft offen (Terminal: FlameWM oder xterm).
+- [ ] `free -m` direkt nach dem Start und mit Firefox + WordCraft offen (Terminal über das Startmenü).
 - [ ] Installer im Boot-Menü ausprobieren (nur in einer VM!).
 
 **Verwaltung (optional, braucht einen zweiten Rechner mit Docker)**

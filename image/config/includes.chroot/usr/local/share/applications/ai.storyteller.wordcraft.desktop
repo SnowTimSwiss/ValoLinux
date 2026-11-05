@@ -3,7 +3,7 @@
 Type=Application
 Name=Textverarbeitung
 GenericName=Textverarbeitung (WordCraft)
-Comment=Texte schreiben und DOCX-Dateien öffnen
+Comment=Texte schreiben, wie Word (DOCX)
 Exec=wordcraft %F
 TryExec=wordcraft
 Icon=ai.storyteller.wordcraft

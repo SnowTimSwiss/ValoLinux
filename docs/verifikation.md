@@ -5,7 +5,8 @@ Ergebnisse hier eintragen (Datum, Methode, Resultat). Bis dahin gilt alles als *
 | Punkt | Status | Ergebnis |
 |---|---|---|
 | ArtCraft-Suite: Reifegrad, DOCX/XLSX/PPTX-Verlust | offen | Pre-Alpha/Alpha laut Berichten |
-| FlameWM: echter RAM-Bedarf (README ~31+44 MB vs. Titel ~17 MB), X11-Stabilität | offen | |
+| FlameWM | nicht mehr verwendet (ab 0.0.4 XFCE) | |
+| XFCE-Einrichtung (Panel, Whisker, xfwm4-Theme, Tastenkürzel) | in Vorschau geprüft 2026-11-05 (Ubuntu 24.04, XFCE 4.18, Xvfb) | Im ISO ist XFCE 4.20 (trixie): Panel-Positionswerte, Plugin-Eigenschaften und `dm-tool lock` auf echtem Gerät prüfen |
 | iroh 1.0: eigener Relay konfigurierbar? | offen | |
 | Firefox ESR `policies.json`: Extensions erzwingen, Einstellungen sperren; welcher Pfad gilt bei Debians `firefox-esr` (`/etc/firefox/policies/` oder `/usr/lib/firefox-esr/distribution/`)? | offen | Agent schreibt vorerst beide; im ISO prüfen mit `about:policies` |
 | Ecosia Family-Friendly-Modus per Policy/Suchmaschinen-URL setzbar? | offen | |

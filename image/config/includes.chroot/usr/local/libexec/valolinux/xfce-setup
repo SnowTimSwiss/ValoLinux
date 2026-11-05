@@ -1,0 +1,40 @@
+#!/bin/sh
+# Runs inside the XFCE session (started by ./session). Applies what static
+# /etc/xdg defaults can't express: wallpaper per monitor, keyboard shortcuts.
+set_prop() { # channel property type value
+    xfconf-query -c "$1" -p "$2" -s "$4" 2>/dev/null || xfconf-query -c "$1" -p "$2" -n -t "$3" -s "$4"
+}
+del_prop() { xfconf-query -c "$1" -p "$2" -r 2>/dev/null || true; }
+
+# --- wallpaper (path chosen by the server, written by valo-agent) ---
+WALL=$(cat /etc/valolinux/wallpaper 2>/dev/null)
+[ -f "$WALL" ] || WALL=/usr/share/backgrounds/valolinux-greeter.png
+for mon in $(xrandr --query 2>/dev/null | awk '/ connected/ {print $1}') screen; do
+    base="/backdrop/screen0/monitor$mon/workspace0"
+    set_prop xfce4-desktop "$base/last-image" string "$WALL"
+    set_prop xfce4-desktop "$base/image-style" int 5      # zoomed (fill)
+    set_prop xfce4-desktop "$base/color-style" int 0
+done
+
+# --- Windows-like shortcuts ---
+K=xfce4-keyboard-shortcuts
+set_prop $K "/commands/custom/Super_L" string "xfce4-popup-whiskermenu"
+set_prop $K "/commands/custom/<Super>e" string "thunar"
+set_prop $K "/commands/custom/<Primary><Alt>Delete" string "xfce4-taskmanager"
+set_prop $K "/commands/custom/<Primary><Shift>Escape" string "xfce4-taskmanager"
+set_prop $K "/commands/custom/Print" string "xfce4-screenshooter"
+set_prop $K "/commands/custom/<Super><Shift>s" string "xfce4-screenshooter -r"
+set_prop $K "/xfwm4/custom/<Super>d" string "show_desktop_key"
+set_prop $K "/xfwm4/custom/<Super>Up" string "maximize_window_key"
+set_prop $K "/xfwm4/custom/<Super>Down" string "hide_window_key"
+set_prop $K "/xfwm4/custom/<Super>Left" string "tile_left_key"
+set_prop $K "/xfwm4/custom/<Super>Right" string "tile_right_key"
+
+# Lock screen = LightDM greeter (our design), unless the server forbids locking
+if grep -q '"allow_lock_screen": *false' /etc/valolinux/permissions.json 2>/dev/null; then
+    del_prop $K "/commands/custom/<Super>l"
+    del_prop $K "/commands/custom/<Primary><Alt>l"
+else
+    set_prop $K "/commands/custom/<Super>l" string "dm-tool lock"
+    set_prop $K "/commands/custom/<Primary><Alt>l" string "dm-tool lock"
+fi

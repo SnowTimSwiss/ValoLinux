@@ -3,7 +3,7 @@
 Type=Application
 Name=Tabellen
 GenericName=Tabellenkalkulation (GridCraft)
-Comment=Tabellen rechnen und XLSX-Dateien öffnen
+Comment=Tabellen rechnen, wie Excel (XLSX)
 Exec=gridcraft %F
 TryExec=gridcraft
 Icon=ai.storyteller.gridcraft

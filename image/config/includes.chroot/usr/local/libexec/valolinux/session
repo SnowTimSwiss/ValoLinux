@@ -1,24 +1,15 @@
 #!/bin/sh
-# ValoLinux X session: start helpers, run FlameWM, fall back to Openbox if FlameWM
-# fails right away (FlameWM is pre-release; see docs/verifikation.md).
+# ValoLinux X session: XFCE plus the ValoLinux helpers.
 LOG="${XDG_CACHE_HOME:-$HOME/.cache}/valolinux-session.log"
 mkdir -p "$(dirname "$LOG")"
-
 /usr/local/libexec/valolinux/adoption-notice >>"$LOG" 2>&1 &
+( sleep 3; /usr/local/libexec/valolinux/xfce-setup ) >>"$LOG" 2>&1 &
+# Defaults that XFCE only reads from the user's own config (home is recreated at logout):
+#  - pinned taskbar apps (panel launchers), - CSS tweaks for the light taskbar
+mkdir -p "$HOME/.config/xfce4/panel" "$HOME/.config/gtk-3.0"
+for d in /etc/xdg/xfce4/panel/launcher-*; do
+    [ -d "$d" ] && [ ! -e "$HOME/.config/xfce4/panel/$(basename "$d")" ] && cp -r "$d" "$HOME/.config/xfce4/panel/"
+done
+[ -e "$HOME/.config/gtk-3.0/gtk.css" ] || cp /usr/share/valolinux/gtk.css "$HOME/.config/gtk-3.0/gtk.css"
 
-FLAME=/usr/libexec/flamewm/flamewm-session-wrapper
-if [ -x "$FLAME" ]; then
-    start=$(date +%s)
-    "$FLAME" >>"$LOG" 2>&1
-    rc=$?
-    if [ "$rc" -eq 0 ] || [ $(( $(date +%s) - start )) -gt 20 ]; then
-        exit "$rc"
-    fi
-    echo "FlameWM exited with $rc after start, falling back to Openbox" >>"$LOG"
-    MSG="FlameWM konnte nicht starten (Code $rc). Notfall-Sitzung: Rechtsklick auf den Desktop für das Menü. Log: $LOG"
-else
-    MSG="FlameWM ist nicht installiert. Notfall-Sitzung: Rechtsklick auf den Desktop für das Menü."
-fi
-command -v xsetroot >/dev/null && xsetroot -solid '#1E1B54'
-(sleep 2; command -v zenity >/dev/null && zenity --warning --title=ValoLinux --text="$MSG") &
-exec openbox-session
+exec startxfce4

@@ -3,7 +3,7 @@
 Type=Application
 Name=Präsentation
 GenericName=Präsentation (DeckCraft)
-Comment=Präsentationen erstellen und PPTX-Dateien öffnen
+Comment=Präsentationen erstellen, wie PowerPoint (PPTX)
 Exec=deckcraft %F
 TryExec=deckcraft
 Icon=ai.storyteller.deckcraft

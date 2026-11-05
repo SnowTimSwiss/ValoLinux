@@ -15,7 +15,8 @@ out=/etc/issue
   echo "common-auth pam_unix: $(grep -c pam_unix /etc/pam.d/common-auth 2>&1)"
   echo "live-config: $(systemctl is-active live-config.service 2>&1)"
   echo "lightdm: $(systemctl is-active lightdm.service 2>&1)"
-  echo "flamewm: $(dpkg-query -W -f='${Version}' flamewm 2>&1)"
+  echo "xfce4-session: $(dpkg-query -W -f='${Version}' xfce4-session 2>&1)"
+  echo "apps: $(dpkg-query -W -f='${Package}=${Version} ' wordcraft gridcraft deckcraft firefox-esr 2>&1)"
   journalctl -b -p warning --no-pager -n 15 2>/dev/null | cut -c1-110
   echo
 } > "$out.diag"

@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Dateien
+Exec=thunar %F
+Icon=system-file-manager
+StartupNotify=true
