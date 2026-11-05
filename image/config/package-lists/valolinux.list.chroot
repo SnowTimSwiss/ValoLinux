@@ -14,6 +14,9 @@ network-manager
 fonts-dejavu-core
 fonts-noto-core
 firmware-linux
+adwaita-icon-theme
+gnome-themes-extra
+
 mesa-vulkan-drivers
 libgl1-mesa-dri
 sudo
