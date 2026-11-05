@@ -31,7 +31,12 @@ Umgebungsvariablen: `VALO_DATA_DIR` (Standard `./data`), `VALO_LISTEN` (`0.0.0.0
 1. Gerät mit ValoLinux starten. Die Server-Adresse kommt, in dieser Reihenfolge, aus `/etc/valolinux/agent.conf` (`server = http://…`), dem Boot-Parameter `valo.server=http://…` oder der automatischen Suche: `http://valolinux.local:8080` (Server-Rechner heisst `valolinux`, mDNS) und `http://valolinux:8080` (DNS-Eintrag `valolinux` im Schulnetz).
 2. Das Gerät zeigt einen 6-stelligen Code (Dialog auf dem Desktop und auf der Konsole vor dem Login).
 3. In der Web-UI unter **Hinzufügen** den Code eingeben, Name, Rolle (Schüler/in, Lehrperson) und Gruppe wählen.
-4. Innert ca. 10 Sekunden holt sich das Gerät seine Konfiguration. Danach prüft es alle 5 Minuten.
+4. Innert ca. 10 Sekunden holt sich das Gerät seine Konfiguration. Danach prüft es jede Minute (eine kleine signierte Anfrage).
+
+## Geräte verwalten
+- **Mehrere Geräte zuweisen:** In der Geräteliste Häkchen setzen, unten Rolle und/oder Gruppe wählen, „Übernehmen“.
+- **Fernaktionen:** Gerät → Aktionen: *Neu starten*, *Ausschalten*. In der Gruppenübersicht für alle Geräte einer Gruppe. Das Gerät führt die Aktion beim nächsten Abgleich aus (Agent fragt jede Minute), danach steht sie als „ausgeführt“ in der Liste. Ausgeschaltete Geräte holen wartende Aktionen beim nächsten Start nach, wartende Aktionen lassen sich abbrechen.
+- **Admin-Passwort pro Gerät:** Gerät → Lokales Admin-Konto → Passwort anzeigen / neu erzeugen.
 
 ## Einstellungen
 Ebenen, die spätere gewinnt: **Standard → Global → Rolle → Gruppe → Gerät**. Jede Einstellung kann auf einer Ebene „erben“ oder einen eigenen Wert haben. Die Geräteseite zeigt, welcher Wert wirkt und woher er kommt.
@@ -63,6 +68,7 @@ Offline: Der Agent wendet beim Start das letzte gültige Manifest aus dem Cache 
 ## Sicherheit (Stand)
 - Admin-Passwörter mit Argon2, Sitzungen serverseitig, CSRF-Token in allen Formularen, Cookies `HttpOnly; SameSite=Strict`.
 - Geräte-Anfragen sind signiert (Zeitfenster 5 Min.), Manifeste sind signiert.
+- Anmeldung: nach 5 Fehlversuchen ist der Benutzername 15 Minuten gesperrt (auch bei falschem 2FA-Code). Nachteil: Jemand kann einen Admin absichtlich kurz aussperren.
 - 2FA (TOTP) für Admins: einrichten unter „Konto“, danach verlangt die Anmeldung Passwort + Code. Falscher Code = Passwort neu eingeben. Passwortwechsel meldet andere Sitzungen ab.
 - **Offen:** 2FA erzwingen (derzeit nur Hinweis), HTTPS direkt im Server (bis dahin Reverse-Proxy), Verschlüsselung der gespeicherten Geräte-Admin-Passwörter, Rechteverwaltung für mehrere Admins, iroh-Transport.
 - Wer den Server kontrolliert, kontrolliert alle Geräte. Web-UI nicht ins Internet stellen.
@@ -80,3 +86,6 @@ Der Server-Test spielt den ganzen Ablauf durch (Setup, Login, Anmeldung, Adoptio
 ![Einstellungen Lehrpersonen](img/ui/06-settings-teacher.png)
 ![App-Katalog](img/ui/07-apps.png)
 ![Konto mit 2FA](img/ui/14-account.png)
+![Geräteliste mit Mehrfachauswahl](img/ui/17-devices-bulk.png)
+![Fernaktionen](img/ui/15-device-actions.png)
+![Gruppen](img/ui/16-groups.png)

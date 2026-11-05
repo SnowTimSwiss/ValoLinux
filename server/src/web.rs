@@ -34,6 +34,7 @@ pub fn routes() -> Router<Shared> {
         .route("/account/admins/{id}/delete", post(admin_delete))
         .route("/logout", post(logout))
         .route("/devices", get(devices_page))
+        .route("/devices/bulk", post(devices_bulk))
         .route("/devices/{id}", get(device_page).post(device_update))
         .route("/devices/{id}/password", post(device_password))
         .route("/devices/{id}/delete", post(device_delete))
@@ -264,8 +265,14 @@ async fn login_submit(State(s): State<Shared>, body: String) -> Page {
     let f = FormData::parse(&body);
     let user = f.text("username");
     let pw = f.get("password").unwrap_or("");
+    if auth::locked_out(&s, &user) {
+        tracing::warn!("login for {user:?} refused: locked after failed attempts");
+        return Ok(auth_page("Anmelden", "Verwaltung der Schulgeräte", "/login", "Anmelden",
+            Some("Zu viele Fehlversuche. Bitte 15 Minuten warten."), false));
+    }
     if let Some(a) = s.db.admin_by_name(&user).map_err(e500)? {
         if auth::verify_password(pw, &a.password_hash) {
+            auth::clear_failures(&s, &user);
             if a.totp_secret.is_some() {
                 let token = util::random_token();
                 s.db.create_pending_login(&token, a.id, valo_proto::now_unix() + 300).map_err(e500)?;
@@ -278,6 +285,7 @@ async fn login_submit(State(s): State<Shared>, body: String) -> Page {
         // spend comparable time for unknown users
         let _ = auth::verify_password(pw, "$argon2id$v=19$m=19456,t=2,p=1$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
     }
+    auth::record_failure(&s, &user);
     tracing::warn!("failed login for {user:?}");
     Ok(auth_page("Anmelden", "Verwaltung der Schulgeräte", "/login", "Anmelden", Some("Benutzername oder Passwort falsch."), false))
 }
@@ -312,6 +320,7 @@ async fn login_2fa(State(s): State<Shared>, body: String) -> Page {
     let a = s.db.admin_by_id(id).map_err(e500)?.ok_or_else(not_found)?;
     let ok = a.totp_secret.as_deref().is_some_and(|sec| auth::check_totp(sec, &a.username, &f.text("code")));
     if !ok {
+        auth::record_failure(&s, &a.username);
         tracing::warn!("wrong 2FA code for {:?}", a.username);
         return Ok(redirect_err("/login", "Code falsch. Bitte nochmals mit Passwort anmelden."));
     }
@@ -362,6 +371,8 @@ async fn dashboard(State(s): State<Shared>, admin: Admin, Query(q): Q) -> Page {
     let online = adopted.iter().filter(|d| is_online(d.last_seen)).count();
     let errors: Vec<_> = adopted.iter().filter(|d| d.last_ok == Some(false)).collect();
     let teachers = adopted.iter().filter(|d| d.role == "teacher").count();
+    let mut recent: Vec<Device> = adopted.iter().map(|d| (*d).clone()).collect();
+    recent.sort_by_key(|d| std::cmp::Reverse(d.last_seen));
     let body = html! {
         @if !admin.has_2fa {
             div.flash.warn { "Dein Konto hat noch keine Zwei-Faktor-Anmeldung. " a href="/account" { "Jetzt einrichten" } }
@@ -387,8 +398,6 @@ async fn dashboard(State(s): State<Shared>, admin: Admin, Query(q): Q) -> Page {
         }
         section.card {
             div.card-head { h2 { "Zuletzt gesehen" } a.button href="/devices" { "Alle Geräte" } }
-            @let mut recent: Vec<Device> = adopted.iter().map(|d| (*d).clone()).collect();
-            @let _ = recent.sort_by_key(|d| std::cmp::Reverse(d.last_seen));
             @if recent.is_empty() {
                 p.empty { "Noch keine Geräte. Starte ein Gerät mit ValoLinux und füge es oben mit dem Code hinzu." }
             } @else {
@@ -400,12 +409,22 @@ async fn dashboard(State(s): State<Shared>, admin: Admin, Query(q): Q) -> Page {
 }
 
 fn device_table(devices: &[Device]) -> Markup {
+    device_table_sel(devices, false)
+}
+
+fn device_table_sel(devices: &[Device], selectable: bool) -> Markup {
     html! {
         table.list {
-            thead { tr { th { "Gerät" } th { "Rolle" } th { "Gruppe" } th { "Status" } th { "Zuletzt gesehen" } } }
+            thead { tr {
+                @if selectable {
+                    th.check { input type="checkbox" aria-label="Alle auswählen"
+                        onclick="document.querySelectorAll('input[name=ids]').forEach(c => c.checked = this.checked)"; }
+                }
+                th { "Gerät" } th { "Rolle" } th { "Gruppe" } th { "Status" } th { "Zuletzt gesehen" } } }
             tbody {
                 @for d in devices {
                     tr {
+                        @if selectable { td.check { input type="checkbox" name="ids" value=(d.id) form="bulk" aria-label="auswählen"; } }
                         td { a href={"/devices/" (d.id)} { b { (d.display_name()) } } br; span.muted.small { (d.hostname) } }
                         td { @if d.adopted() { span class={"role " (d.role)} { (role_label(&d.role)) } } @else { "–" } }
                         td { (d.group_name.as_deref().unwrap_or("–")) }
@@ -451,10 +470,56 @@ async fn devices_page(State(s): State<Shared>, admin: Admin, Query(q): Q) -> Pag
             a.button.primary href="/adopt" { "＋ Gerät hinzufügen" }
         }
         section.card {
-            @if devices.is_empty() { p.empty { "Keine Geräte gefunden." } } @else { (device_table(&devices)) }
+            @if devices.is_empty() { p.empty { "Keine Geräte gefunden." } } @else { (device_table_sel(&devices, true)) }
+        }
+        @if !devices.is_empty() {
+            form id="bulk" class="savebar" method="post" action="/devices/bulk" {
+                (csrf(&admin))
+                span.muted.small { "Ausgewählte Geräte:" }
+                select name="role" aria-label="Rolle" {
+                    option value="" { "Rolle unverändert" }
+                    option value="student" { "→ Schüler/in" }
+                    option value="teacher" { "→ Lehrperson" }
+                }
+                select name="group" aria-label="Gruppe" {
+                    option value="" { "Gruppe unverändert" }
+                    option value="none" { "→ keine Gruppe" }
+                    @for g in &groups { option value=(g.id) { "→ " (g.name) } }
+                }
+                button.primary type="submit" { "Übernehmen" }
+            }
         }
     };
     Ok(layout(&s, &admin, "/devices", "Geräte", &q, body))
+}
+
+async fn devices_bulk(State(s): State<Shared>, admin: Admin, body: String) -> Page {
+    let f = FormData::parse(&body);
+    admin.check_csrf(&f)?;
+    let ids: Vec<i64> = f.all("ids").iter().filter_map(|v| v.parse().ok()).collect();
+    if ids.is_empty() {
+        return Ok(redirect_err("/devices", "Keine Geräte ausgewählt."));
+    }
+    let role = match f.text("role").as_str() {
+        "student" => Some("student"),
+        "teacher" => Some("teacher"),
+        _ => None,
+    };
+    let group: Option<Option<i64>> = match f.text("group").as_str() {
+        "" => None,
+        "none" => Some(None),
+        g => Some(Some(g.parse().map_err(|_| redirect_err("/devices", "Ungültige Gruppe."))?)),
+    };
+    let mut n = 0;
+    for id in ids {
+        if let Some(d) = s.db.device(id).map_err(e500)?.filter(|d| d.adopted()) {
+            let r = role.unwrap_or(&d.role);
+            let g = group.unwrap_or(d.group_id);
+            s.db.update_device(d.id, &d.name, r, g).map_err(e500)?;
+            n += 1;
+        }
+    }
+    Ok(redirect_msg("/devices", &format!("{n} Geräte aktualisiert.")))
 }
 
 fn group_select(groups: &[crate::db::Group], selected: Option<i64>) -> Markup {
@@ -1069,16 +1134,6 @@ async fn app_delete(State(s): State<Shared>, admin: Admin, Path(id): Path<String
     Ok(redirect_msg("/apps", "App entfernt."))
 }
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn flatpak_ref_validation_and_slug() {
-        assert!(super::valid_flatpak_ref("org.gimp.GIMP"));
-        assert!(!super::valid_flatpak_ref("gimp"));
-        assert!(!super::valid_flatpak_ref("org.gimp; rm -rf /"));
-        assert_eq!(super::slug("Tux Paint!"), "tux-paint");
-    }
-}
 
 
 // ---------------------------------------------------------------------------
@@ -1224,4 +1279,15 @@ async fn admin_delete(State(s): State<Shared>, admin: Admin, Path(id): Path<i64>
     }
     s.db.delete_admin(id).map_err(e500)?;
     Ok(redirect_msg("/account", "Admin gelöscht."))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn flatpak_ref_validation_and_slug() {
+        assert!(super::valid_flatpak_ref("org.gimp.GIMP"));
+        assert!(!super::valid_flatpak_ref("gimp"));
+        assert!(!super::valid_flatpak_ref("org.gimp; rm -rf /"));
+        assert_eq!(super::slug("Tux Paint!"), "tux-paint");
+    }
 }

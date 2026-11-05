@@ -1,5 +1,8 @@
 //! ValoLinux management server: web UI for admins plus the API the device agents poll.
 
+// Handlers return axum `Response` as error type; that is idiomatic here.
+#![allow(clippy::result_large_err)]
+
 mod api;
 mod auth;
 mod db;
@@ -17,6 +20,8 @@ pub struct AppState {
     pub key: Identity,
     /// Set the `Secure` flag on cookies (when served via HTTPS).
     pub secure_cookies: bool,
+    /// Failed logins per username: (count, window start). In memory on purpose.
+    pub failed_logins: std::sync::Mutex<std::collections::HashMap<String, (u32, i64)>>,
 }
 
 pub type Shared = Arc<AppState>;
@@ -100,7 +105,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     restrict_data_dir(&data_dir);
     tracing::info!("server public key: {}", key.public_key());
 
-    let state = Arc::new(AppState { db, key, secure_cookies });
+    let state = Arc::new(AppState { db, key, secure_cookies, failed_logins: Default::default() });
     let listener = tokio::net::TcpListener::bind(&listen).await?;
     tracing::info!("listening on http://{listen}");
     axum::serve(listener, app(state)).await?;

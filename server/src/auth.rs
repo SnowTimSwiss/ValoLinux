@@ -29,6 +29,28 @@ pub fn login_cookie(state: &Shared, admin_id: i64) -> Result<String, rusqlite::E
     Ok(format!("{COOKIE}={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={SESSION_SECS}{secure}"))
 }
 
+const MAX_FAILURES: u32 = 5;
+const LOCKOUT_SECS: i64 = 15 * 60;
+
+/// True while a username is locked after too many failed logins.
+pub fn locked_out(state: &Shared, username: &str) -> bool {
+    let map = state.failed_logins.lock().unwrap_or_else(|e| e.into_inner());
+    map.get(&username.to_lowercase())
+        .is_some_and(|(n, since)| *n >= MAX_FAILURES && valo_proto::now_unix() - since < LOCKOUT_SECS)
+}
+
+pub fn record_failure(state: &Shared, username: &str) {
+    let mut map = state.failed_logins.lock().unwrap_or_else(|e| e.into_inner());
+    let now = valo_proto::now_unix();
+    map.retain(|_, (_, since)| now - *since < LOCKOUT_SECS);
+    let e = map.entry(username.to_lowercase()).or_insert((0, now));
+    e.0 += 1;
+}
+
+pub fn clear_failures(state: &Shared, username: &str) {
+    state.failed_logins.lock().unwrap_or_else(|e| e.into_inner()).remove(&username.to_lowercase());
+}
+
 pub fn logout_cookie() -> String {
     format!("{COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0")
 }

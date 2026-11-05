@@ -9,7 +9,12 @@ use tower::ServiceExt;
 use valo_proto::*;
 
 fn state() -> crate::Shared {
-    Arc::new(AppState { db: Db::open_in_memory().unwrap(), key: Identity::generate().unwrap(), secure_cookies: false })
+    Arc::new(AppState {
+        db: Db::open_in_memory().unwrap(),
+        key: Identity::generate().unwrap(),
+        secure_cookies: false,
+        failed_logins: Default::default(),
+    })
 }
 
 async fn send(s: &crate::Shared, req: Request<Body>) -> (StatusCode, Vec<(String, String)>, String) {
@@ -385,4 +390,46 @@ async fn remote_actions_roundtrip() {
     let (st, _, body) = send(&s, get(&format!("/devices/{did}"), &cookie)).await;
     assert_eq!(st, StatusCode::OK);
     assert!(body.contains("ausgeführt"));
+}
+
+#[tokio::test]
+async fn bulk_assign() {
+    let s = state();
+    let (cookie, csrf) = login(&s).await;
+    s.db.create_group("8c").unwrap();
+    let gid = s.db.groups().unwrap()[0].id;
+    let mut ids = vec![];
+    for i in 0..3 {
+        let d = s.db.upsert_enrolling_device(&format!("key{i}"), || format!("CODE0{i}"), "h", "", "", "").unwrap();
+        s.db.adopt(d.id, &format!("pc{i}"), "student", None, "pw", "$6$x").unwrap();
+        ids.push(d.id);
+    }
+    let body = format!("csrf={csrf}&ids={}&ids={}&role=teacher&group={gid}", ids[0], ids[1]);
+    assert_eq!(send(&s, form("/devices/bulk", &cookie, &body)).await.0, StatusCode::SEE_OTHER);
+    let d0 = s.db.device(ids[0]).unwrap().unwrap();
+    let d2 = s.db.device(ids[2]).unwrap().unwrap();
+    assert_eq!((d0.role.as_str(), d0.group_id, d0.name.as_str()), ("teacher", Some(gid), "pc0"));
+    assert_eq!((d2.role.as_str(), d2.group_id), ("student", None));
+    // group "unchanged", role only
+    send(&s, form("/devices/bulk", &cookie, &format!("csrf={csrf}&ids={}&role=student&group=", ids[0]))).await;
+    let d0 = s.db.device(ids[0]).unwrap().unwrap();
+    assert_eq!((d0.role.as_str(), d0.group_id), ("student", Some(gid)));
+    let (_, _, page) = send(&s, get("/devices", &cookie)).await;
+    assert!(page.contains("form=\"bulk\""));
+}
+
+#[tokio::test]
+async fn login_lockout() {
+    let s = state();
+    login(&s).await;
+    for _ in 0..5 {
+        send(&s, login_form("admin", "wrong-password")).await;
+    }
+    // even the right password is refused while locked
+    let (_, h, body) = send(&s, login_form("admin", "correct-horse-1")).await;
+    assert!(!h.iter().any(|(k, _)| k == "set-cookie"));
+    assert!(body.contains("Zu viele Fehlversuche"));
+    s.failed_logins.lock().unwrap().clear();
+    let (_, h, _) = send(&s, login_form("admin", "correct-horse-1")).await;
+    assert!(h.iter().any(|(k, _)| k == "set-cookie"));
 }
