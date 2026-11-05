@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- ValoLinux: one light taskbar at the bottom, start button and apps centred (Windows-11-like) -->
+<!-- ValoLinux: one light taskbar at the bottom, start button and apps on the left (Windows-like) -->
 <channel name="xfce4-panel" version="1.0">
   <property name="configver" type="int" value="2"/>
   <property name="panels" type="array">
@@ -21,7 +21,6 @@
         <value type="double" value="0.92"/>
       </property>
       <property name="plugin-ids" type="array">
-        <value type="int" value="1"/>
         <value type="int" value="2"/>
         <value type="int" value="10"/>
         <value type="int" value="11"/>
@@ -39,10 +38,6 @@
     </property>
   </property>
   <property name="plugins" type="empty">
-    <property name="plugin-1" type="string" value="separator">
-      <property name="expand" type="bool" value="true"/>
-      <property name="style" type="uint" value="0"/>
-    </property>
     <property name="plugin-2" type="string" value="whiskermenu"/>
     <property name="plugin-10" type="string" value="launcher">
       <property name="items" type="array">

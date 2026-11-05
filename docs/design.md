@@ -27,8 +27,12 @@ Alle Grafiken erzeugt `tools/make-branding.py` reproduzierbar (fester Zufallswer
 - `usr/share/backgrounds/valolinux-splash.png`: Boot-Menü, 640×480
 - `usr/share/pixmaps/valolinux-logo.png`: Logo 256×256 (Greeter-Benutzerbild)
 
-## Desktop (XFCE, ähnlich Windows 11)
-- Taskleiste unten, hell und leicht transparent, Start und Apps zentriert; aktive App mit Amber-Strich.
+## Desktop (XFCE, von Windows inspiriert)
+Ziel: Kinder kennen Windows, also soll sich alles vertraut anfühlen, ohne Windows zu kopieren.
+- Taskleiste unten, hell und leicht transparent, Startknopf und angeheftete Apps links, Uhr/Systembereich rechts; aktive App mit Amber-Strich.
+- Startmenü: Raster mit angehefteten Apps, Kategorien als Symbolleiste oben, Suche und Ein/Aus unten.
+- Vertraute Namen: Dateien, Editor, Fotos, Task-Manager, Bildschirmfoto, Firefox, Textverarbeitung, Tabellen, Präsentation (Hook `0200-valo-app-names`).
+- Desktop: Papierkorb, Rechtsklick-Menü (Ordner/Dokument erstellen). „Dateien“ mit heller Seitenleiste und Symbolansicht.
 - Fensterdesign „ValoLinux“ (`usr/share/themes/ValoLinux/xfwm4`, erzeugt mit `tools/make-xfwm-theme.py`): weisse Titelleiste, breite flache Knöpfe, Schliessen rot beim Darüberfahren.
 - GTK: Arc (hell), Symbole: Papirus-Light, Schrift: Inter 10. Kleine CSS-Anpassungen in `usr/share/valolinux/gtk.css`.
 - Vorgaben: `etc/xdg/xfce4/` (Panel, Whisker-Menü, Fenster, Schriften), beim Anmelden ergänzt durch `usr/local/libexec/valolinux/session` und `xfce-setup` (Hintergrund pro Bildschirm, Tastenkürzel).

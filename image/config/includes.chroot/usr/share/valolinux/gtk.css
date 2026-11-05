@@ -21,3 +21,16 @@
   box-shadow: inset 0 -3px 0 0 #F7A054;   /* ValoLinux amber: active app */
 }
 #whiskermenu-button { margin: 4px 2px; }
+
+/* Light sidebars (file manager, dialogs) like the Windows Explorer; Arc makes them dark */
+.sidebar, .sidebar row, .sidebar treeview, .sidebar treeview.view, .thunar .sidebar,
+placessidebar, placessidebar list, placessidebar row {
+  background-color: #f7f7f9;
+  color: #1b1b1d;
+}
+.sidebar treeview.view:selected, placessidebar row:selected,
+.sidebar treeview.view:selected:focus {
+  background-color: rgba(247, 160, 84, 0.25);
+  color: #1b1b1d;
+}
+.sidebar treeview.view header button { color: #6e6a8a; background: transparent; }

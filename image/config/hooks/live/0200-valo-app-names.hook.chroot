@@ -1,0 +1,30 @@
+#!/bin/sh
+# Friendly, Windows-like names in menus (also replaces the German translation).
+# Runs after the packages are installed; missing files are skipped.
+set -e
+rename() { # file name comment  (only the [Desktop Entry] section is changed)
+    f="/usr/share/applications/$1"
+    [ -f "$f" ] || return 0
+    awk -v name="$2" -v comment="$3" '
+        /^\[/ { main = ($0 == "[Desktop Entry]") }
+        main && /^(Name|Comment|GenericName)\[/ { next }
+        main && /^Name=/    { print "Name=" name; next }
+        main && /^Comment=/ { print "Comment=" comment; next }
+        { print }
+    ' "$f" > "$f.valo" && mv "$f.valo" "$f"
+}
+rename thunar.desktop                 "Dateien"          "Dateien und Ordner anzeigen (wie der Explorer)"
+rename org.xfce.thunar.desktop        "Dateien"          "Dateien und Ordner anzeigen (wie der Explorer)"
+rename org.xfce.mousepad.desktop      "Editor"           "Einfache Texte bearbeiten"
+rename org.xfce.ristretto.desktop     "Fotos"            "Bilder anschauen"
+rename xfce4-taskmanager.desktop      "Task-Manager"     "Laufende Programme anzeigen und beenden"
+rename org.xfce.taskmanager.desktop   "Task-Manager"     "Laufende Programme anzeigen und beenden"
+rename org.xfce.screenshooter.desktop "Bildschirmfoto"   "Ein Foto vom Bildschirm machen"
+rename xfce4-screenshooter.desktop    "Bildschirmfoto"   "Ein Foto vom Bildschirm machen"
+rename firefox-esr.desktop            "Firefox"          "Im Internet surfen"
+rename xfce4-terminal.desktop         "Terminal"         "Befehle eingeben"
+rename org.xfce.terminal.desktop      "Terminal"         "Befehle eingeben"
+rename xfce-settings-manager.desktop  "Einstellungen"    "Einstellungen des Computers"
+rename org.xfce.settings.manager.desktop "Einstellungen" "Einstellungen des Computers"
+rename pavucontrol.desktop            "Lautstärke"       "Lautstärke und Audiogeräte einstellen"
+rename org.pulseaudio.pavucontrol.desktop "Lautstärke"   "Lautstärke und Audiogeräte einstellen"
