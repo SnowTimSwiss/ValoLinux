@@ -37,3 +37,5 @@ x11-xserver-utils
 # find the management server as valolinux.local (mDNS)
 avahi-daemon
 libnss-mdns
+# pgrep/pkill for the logout cleanup script
+procps
