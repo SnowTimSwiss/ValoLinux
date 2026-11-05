@@ -313,7 +313,7 @@ async fn dashboard(State(s): State<Shared>, admin: Admin, Query(q): Q) -> Page {
     let teachers = adopted.iter().filter(|d| d.role == "teacher").count();
     let body = html! {
         div.stats {
-            a.stat href="/devices" { span.num { (adopted.len()) } span.lbl { "Geräte" } span.sub { (teachers) " Lehrpersonen · " (adopted.len() - teachers) " Schüler/innen" } }
+            a.stat href="/devices" { span.num { (adopted.len()) } span.lbl { "Geräte" } span.sub { (teachers) (if teachers == 1 { " Lehrperson · " } else { " Lehrpersonen · " }) (adopted.len() - teachers) " Schüler/innen" } }
             a.stat href="/devices" { span.num.good { (online) } span.lbl { "Online" } span.sub { "in den letzten 10 Minuten" } }
             a.stat href="/adopt" { span.num.warn { (pending.len()) } span.lbl { "Warten auf Freigabe" } span.sub { "neue Geräte" } }
             a.stat href="/devices" { span.num.bad[!errors.is_empty()] { (errors.len()) } span.lbl { "Mit Fehlern" } span.sub { "letzte Anwendung" } }

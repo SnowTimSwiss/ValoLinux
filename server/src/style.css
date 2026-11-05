@@ -121,7 +121,7 @@ input.code { font-family: "JetBrains Mono", ui-monospace, monospace; text-transf
   font-size: 22px; font-weight: 700; text-align: center; width: 200px; }
 .codeform.big input.code { width: 230px; min-height: 52px; }
 .codeform.big button { min-height: 52px; padding: 0 22px; }
-.code-display { font-family: "JetBrains Mono", monospace; font-size: 30px; font-weight: 800; letter-spacing: 4px;
+.code-display { white-space: nowrap; flex: none; font-family: "JetBrains Mono", monospace; font-size: 30px; font-weight: 800; letter-spacing: 4px;
   background: var(--grad); color: var(--night); padding: 8px 18px; border-radius: 12px; }
 .code-small { font-family: "JetBrains Mono", monospace; font-weight: 700; letter-spacing: 2px; background: var(--bg); border: 1px solid var(--line); padding: 3px 8px; border-radius: 6px; }
 .found { display: flex; align-items: center; gap: 18px; margin-bottom: 18px; }
@@ -221,3 +221,4 @@ body.auth { min-height: 100vh; display: grid; place-items: center; padding: 20px
   form.inline { grid-template-columns: 1fr; }
   .codeform { flex-direction: column; }
 }
+.field .segmented { justify-self: start; }
