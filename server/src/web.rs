@@ -1513,7 +1513,7 @@ pub async fn audit_layer(
     resp
 }
 
-fn audit_table(entries: &[(i64, String, String, String, String)]) -> Markup {
+fn audit_table(entries: &[crate::db::AuditEntry]) -> Markup {
     html! {
         table.list.compact {
             tbody {

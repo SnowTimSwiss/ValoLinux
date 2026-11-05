@@ -129,6 +129,9 @@ impl Device {
     }
 }
 
+/// (ts, admin, subject, link, text)
+pub type AuditEntry = (i64, String, String, String, String);
+
 #[derive(Debug, Clone)]
 pub struct AdminRow {
     pub id: i64,
@@ -559,8 +562,8 @@ impl Db {
         Ok(())
     }
 
-    /// (ts, admin, subject, link, text), newest first
-    pub fn audit(&self, limit: i64) -> Result<Vec<(i64, String, String, String, String)>> {
+    /// Newest first.
+    pub fn audit(&self, limit: i64) -> Result<Vec<AuditEntry>> {
         let c = self.c();
         let mut st = c.prepare("SELECT ts, admin, subject, link, text FROM audit ORDER BY id DESC LIMIT ?1")?;
         st.query_map([limit], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)))?.collect()
