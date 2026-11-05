@@ -37,6 +37,7 @@ Umgebungsvariablen: `VALO_DATA_DIR` (Standard `./data`), `VALO_LISTEN` (`0.0.0.0
 - **Mehrere Geräte zuweisen:** In der Geräteliste Häkchen setzen, unten Rolle und/oder Gruppe wählen, „Übernehmen“.
 - **Fernaktionen:** Gerät → Aktionen: *Neu starten*, *Ausschalten*. In der Gruppenübersicht für alle Geräte einer Gruppe. Das Gerät führt die Aktion beim nächsten Abgleich aus (Agent fragt jede Minute), danach steht sie als „ausgeführt“ in der Liste. Ausgeschaltete Geräte holen wartende Aktionen beim nächsten Start nach, wartende Aktionen lassen sich abbrechen.
 - **Hintergrundbilder:** Unter „Hintergründe“ PNG/JPEG hochladen, dann unter Einstellungen → Desktop pro Ebene auswählen. Das Gerät lädt das Bild, prüft die Prüfsumme aus dem signierten Manifest und setzt es für neue Sitzungen (über `/etc/skel`; mit Home-Modus „Löschen“ ab der nächsten Anmeldung). Bilder sind ohne Anmeldung abrufbar (`/assets/<sha256>`), damit Geräte sie laden können: keine vertraulichen Bilder hochladen.
+- **Protokoll:** Jede Änderung durch einen Admin wird mit Zeit, Admin und betroffenem Gerät/Gruppe festgehalten (Übersicht → Letzte Änderungen, ganzes Protokoll unter `/log`).
 - **Admin-Passwort pro Gerät:** Gerät → Lokales Admin-Konto → Passwort anzeigen / neu erzeugen.
 
 ## Einstellungen
@@ -93,3 +94,4 @@ Der Server-Test spielt den ganzen Ablauf durch (Setup, Login, Anmeldung, Adoptio
 ![Gruppen](img/ui/16-groups.png)
 ![Browser: Lesezeichen und Webfilter](img/ui/18-browser-settings.png)
 ![Hintergründe](img/ui/19-wallpapers.png)
+![Protokoll](img/ui/21-audit.png)

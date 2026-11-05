@@ -247,3 +247,4 @@ textarea { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 13
 .wallcard input:checked + .wallthumb { border-color: var(--amber); box-shadow: 0 0 0 3px rgba(247,160,84,.3); }
 .wallcard input:focus-visible + .wallthumb { outline: 2px solid var(--amber); }
 .tile input[type=file] { min-height: 0; padding: 7px; font-size: 13px; }
+.nowrap { white-space: nowrap; }

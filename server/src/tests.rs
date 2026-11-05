@@ -517,3 +517,25 @@ fn old_long_salt_hashes_are_fixed() {
     assert_eq!(h.split('$').nth(3).unwrap().len(), 16);
     assert_eq!(db.fix_admin_hashes(crate::util::crypt_sha512).unwrap(), 0, "idempotent");
 }
+
+#[tokio::test]
+async fn audit_log_records_changes() {
+    let s = state();
+    let (cookie, csrf) = login(&s).await;
+    send(&s, form("/groups", &cookie, &format!("csrf={csrf}&name=9a"))).await;
+    let gid = s.db.groups().unwrap()[0].id;
+    send(&s, form(&format!("/settings/group:{gid}"), &cookie, &format!("csrf={csrf}&keyboard=de&apps_mode=inherit"))).await;
+    // failed action (bad csrf) is not logged
+    send(&s, form("/groups", &cookie, "csrf=wrong&name=x")).await;
+    let log = s.db.audit(10).unwrap();
+    assert_eq!(log.len(), 2, "{log:?}");
+    assert_eq!(log[0].1, "admin");
+    assert_eq!(log[0].2, "Einstellungen Gruppe 9a");
+    assert_eq!(log[0].4, "Einstellungen gespeichert.");
+    assert_eq!(log[1].4, "Gruppe angelegt.");
+    let (st, _, body) = send(&s, get("/log", &cookie)).await;
+    assert_eq!(st, StatusCode::OK);
+    assert!(body.contains("Gruppe angelegt."));
+    let (_, _, dash) = send(&s, get("/", &cookie)).await;
+    assert!(dash.contains("Letzte Änderungen"));
+}

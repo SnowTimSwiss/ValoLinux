@@ -45,6 +45,7 @@ pub fn routes() -> Router<Shared> {
         .route("/groups/{id}/delete", post(group_delete))
         .route("/settings", get(|| async { Redirect::to("/settings/global") }))
         .route("/settings/{scope}", get(settings_page).post(settings_submit))
+        .route("/log", get(log_page))
         .route("/apps", get(apps_page).post(app_create))
         .route("/apps/{id}/delete", post(app_delete))
         .route(
@@ -381,6 +382,7 @@ async fn dashboard(State(s): State<Shared>, admin: Admin, Query(q): Q) -> Page {
     let online = adopted.iter().filter(|d| is_online(d.last_seen)).count();
     let errors: Vec<_> = adopted.iter().filter(|d| d.last_ok == Some(false)).collect();
     let teachers = adopted.iter().filter(|d| d.role == "teacher").count();
+    let audit = s.db.audit(6).map_err(e500)?;
     let mut recent: Vec<Device> = adopted.iter().map(|d| (*d).clone()).collect();
     recent.sort_by_key(|d| std::cmp::Reverse(d.last_seen));
     let body = html! {
@@ -404,6 +406,12 @@ async fn dashboard(State(s): State<Shared>, admin: Admin, Query(q): Q) -> Page {
             section.card {
                 h2 { "Geräte mit Fehlern" }
                 (device_table(&errors.iter().map(|d| (**d).clone()).collect::<Vec<_>>()))
+            }
+        }
+        @if !audit.is_empty() {
+            section.card {
+                div.card-head { h2 { "Letzte Änderungen" } a.button href="/log" { "Ganzes Protokoll" } }
+                (audit_table(&audit))
             }
         }
         section.card {
@@ -1434,6 +1442,103 @@ async fn wallpaper_delete(State(s): State<Shared>, admin: Admin, Path(sha): Path
     s.db.delete_asset(&sha).map_err(e500)?;
     let _ = tokio::fs::remove_file(s.assets_dir.join(&sha)).await;
     Ok(redirect_msg("/wallpapers", "Bild gelöscht."))
+}
+
+// ---------------------------------------------------------------------------
+// audit log
+// ---------------------------------------------------------------------------
+
+/// Human-readable subject for a UI path ("/devices/5/action" -> "Gerät 5a-PC-01").
+fn subject_of(s: &Shared, path: &str) -> (String, String) {
+    let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+    match parts.as_slice() {
+        ["devices", id, ..] if id.parse::<i64>().is_ok() => {
+            let id: i64 = id.parse().unwrap_or(0);
+            match s.db.device(id).ok().flatten() {
+                Some(d) => (format!("Gerät {}", d.display_name()), format!("/devices/{id}")),
+                None => ("Gerät".into(), "/devices".into()),
+            }
+        }
+        ["groups", id, ..] if id.parse::<i64>().is_ok() => {
+            let id: i64 = id.parse().unwrap_or(0);
+            match s.db.group(id).ok().flatten() {
+                Some(g) => (format!("Gruppe {}", g.name), "/groups".into()),
+                None => ("Gruppe".into(), "/groups".into()),
+            }
+        }
+        ["settings", scope] => {
+            let scope = scope.replace("%3A", ":");
+            (format!("Einstellungen {}", scope_label(s, &scope)), format!("/settings/{scope}"))
+        }
+        ["devices", ..] => ("Geräte".into(), "/devices".into()),
+        ["groups", ..] => ("Gruppen".into(), "/groups".into()),
+        ["apps", ..] => ("App-Katalog".into(), "/apps".into()),
+        ["wallpapers", ..] => ("Hintergründe".into(), "/wallpapers".into()),
+        ["account", ..] => ("Konto".into(), "/account".into()),
+        ["adopt", ..] => ("Gerät hinzufügen".into(), "/adopt".into()),
+        _ => (path.to_string(), String::new()),
+    }
+}
+
+/// Records every successful admin change. Successful form posts redirect with
+/// `?msg=...`; that message is what gets logged, with admin, time and subject.
+pub async fn audit_layer(
+    State(s): State<Shared>,
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> Response {
+    if req.method() != axum::http::Method::POST {
+        return next.run(req).await;
+    }
+    let path = req.uri().path().to_string();
+    let admin = auth::session_token(req.headers())
+        .and_then(|t| s.db.session(&t).ok().flatten())
+        .and_then(|(id, _)| s.db.admin_by_id(id).ok().flatten())
+        .map(|a| a.username);
+    // subject before the change (a deleted device can't be looked up afterwards)
+    let before = subject_of(&s, &path);
+    let resp = next.run(req).await;
+    let Some(admin) = admin else { return resp };
+    let location = resp.headers().get(header::LOCATION).and_then(|v| v.to_str().ok()).unwrap_or("");
+    if let Some((loc_path, query)) = location.split_once('?') {
+        let msg = form_urlencoded::parse(query.as_bytes()).find(|(k, _)| k == "msg").map(|(_, v)| v.to_string());
+        if let Some(msg) = msg {
+            // prefer the redirect target when it names an object (e.g. after adopting)
+            let (subject, link) = if loc_path.starts_with("/devices/") { subject_of(&s, loc_path) } else { before };
+            if let Err(e) = s.db.add_audit(&admin, &subject, &link, &msg) {
+                tracing::error!("audit log: {e}");
+            }
+        }
+    }
+    resp
+}
+
+fn audit_table(entries: &[(i64, String, String, String, String)]) -> Markup {
+    html! {
+        table.list.compact {
+            tbody {
+                @for (ts, admin, subject, link, text) in entries {
+                    tr {
+                        td.muted.nowrap { (ago(Some(*ts))) }
+                        td { b { (admin) } }
+                        td { @if link.is_empty() { (subject) } @else { a href=(link) { (subject) } } }
+                        td.muted { (text) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+async fn log_page(State(s): State<Shared>, admin: Admin, Query(q): Q) -> Page {
+    let entries = s.db.audit(500).map_err(e500)?;
+    let body = html! {
+        p.muted { "Alle Änderungen durch Admins, neueste zuerst (die letzten 5000 werden aufbewahrt)." }
+        section.card {
+            @if entries.is_empty() { p.empty { "Noch keine Änderungen." } } @else { (audit_table(&entries)) }
+        }
+    };
+    Ok(layout(&s, &admin, "/log", "Protokoll", &q, body))
 }
 
 #[cfg(test)]

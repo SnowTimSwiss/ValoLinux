@@ -65,6 +65,14 @@ CREATE TABLE IF NOT EXISTS assets (
     size INTEGER NOT NULL,
     created INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS audit (
+    id INTEGER PRIMARY KEY,
+    ts INTEGER NOT NULL,
+    admin TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    link TEXT NOT NULL,
+    text TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS policies (
     scope TEXT PRIMARY KEY,
     json TEXT NOT NULL
@@ -536,6 +544,26 @@ impl Db {
         let mut st =
             c.prepare("SELECT kind, created, done FROM actions WHERE device_id = ?1 ORDER BY id DESC LIMIT 5")?;
         st.query_map([device_id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?.collect()
+    }
+
+    // ----- audit log ---------------------------------------------------------
+
+    pub fn add_audit(&self, admin: &str, subject: &str, link: &str, text: &str) -> Result<()> {
+        let c = self.c();
+        c.execute(
+            "INSERT INTO audit (ts, admin, subject, link, text) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![now_unix(), admin, subject, link, text],
+        )?;
+        // keep the log bounded
+        c.execute("DELETE FROM audit WHERE id <= (SELECT MAX(id) FROM audit) - 5000", [])?;
+        Ok(())
+    }
+
+    /// (ts, admin, subject, link, text), newest first
+    pub fn audit(&self, limit: i64) -> Result<Vec<(i64, String, String, String, String)>> {
+        let c = self.c();
+        let mut st = c.prepare("SELECT ts, admin, subject, link, text FROM audit ORDER BY id DESC LIMIT ?1")?;
+        st.query_map([limit], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)))?.collect()
     }
 
     // ----- groups ------------------------------------------------------------

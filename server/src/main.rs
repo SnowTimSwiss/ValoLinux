@@ -29,7 +29,11 @@ pub struct AppState {
 pub type Shared = Arc<AppState>;
 
 pub fn app(state: Shared) -> Router {
-    Router::new().merge(web::routes()).merge(api::routes()).with_state(state)
+    Router::new()
+        .merge(web::routes())
+        .layer(axum::middleware::from_fn_with_state(state.clone(), web::audit_layer))
+        .merge(api::routes())
+        .with_state(state)
 }
 
 fn load_or_create_key(path: &std::path::Path) -> std::io::Result<Identity> {
