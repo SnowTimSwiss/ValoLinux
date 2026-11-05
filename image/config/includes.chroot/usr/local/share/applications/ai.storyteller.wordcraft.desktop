@@ -1,0 +1,13 @@
+[Desktop Entry]
+# ValoLinux: overrides the package's entry (same file name, /usr/local/share has priority)
+Type=Application
+Name=Textverarbeitung
+GenericName=Textverarbeitung (WordCraft)
+Comment=Texte schreiben und DOCX-Dateien öffnen
+Exec=wordcraft %F
+TryExec=wordcraft
+Icon=ai.storyteller.wordcraft
+Categories=Office;WordProcessor;
+Keywords=word;docx;text;brief;dokument;wordcraft;schreiben;
+MimeType=application/vnd.openxmlformats-officedocument.wordprocessingml.document;application/vnd.ms-word.document.macroEnabled.12;application/vnd.openxmlformats-officedocument.wordprocessingml.template;application/vnd.ms-word.template.macroEnabled.12;application/msword;application/msword-template;application/vnd.oasis.opendocument.text;application/rtf;text/rtf;text/markdown;text/x-tex;text/html;
+StartupNotify=true

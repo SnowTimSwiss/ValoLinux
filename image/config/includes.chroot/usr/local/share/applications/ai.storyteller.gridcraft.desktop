@@ -1,0 +1,13 @@
+[Desktop Entry]
+# ValoLinux: overrides the package's entry (same file name, /usr/local/share has priority)
+Type=Application
+Name=Tabellen
+GenericName=Tabellenkalkulation (GridCraft)
+Comment=Tabellen rechnen und XLSX-Dateien öffnen
+Exec=gridcraft %F
+TryExec=gridcraft
+Icon=ai.storyteller.gridcraft
+Categories=Office;Spreadsheet;
+Keywords=excel;xlsx;tabelle;rechnen;gridcraft;
+MimeType=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;application/vnd.ms-excel.sheet.macroEnabled.12;application/vnd.ms-excel.sheet.binary.macroEnabled.12;application/vnd.oasis.opendocument.spreadsheet;text/csv;text/tab-separated-values;
+StartupNotify=true

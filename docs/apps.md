@@ -3,7 +3,7 @@
 | Bereich | Inhalt |
 |---|---|
 | Desktop | FlameWM (X11-Sitzung), LightDM mit GTK-Greeter, Autologin als `valo` |
-| Office | WordCraft, GridCraft, DeckCraft (ArtCraft, Pre-Alpha, aus GitHub-Releases) |
+| Office | WordCraft, GridCraft, DeckCraft (ArtCraft, Pre-Alpha, aus GitHub-Releases), im Menü als „Textverarbeitung“, „Tabellen“, „Präsentation“ (Suchwörter: Word, Excel, PowerPoint) |
 | Browser | Firefox ESR, uBlock Origin per Policy, Updates aus |
 | Software | Flatpak installiert, noch kein eigener Remote/Katalog |
 | System | zram (RAM/2, zstd), NetworkManager, Firmware (`firmware-linux`), Mesa-Treiber |

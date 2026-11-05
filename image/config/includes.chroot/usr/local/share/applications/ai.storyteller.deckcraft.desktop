@@ -1,0 +1,13 @@
+[Desktop Entry]
+# ValoLinux: overrides the package's entry (same file name, /usr/local/share has priority)
+Type=Application
+Name=Präsentation
+GenericName=Präsentation (DeckCraft)
+Comment=Präsentationen erstellen und PPTX-Dateien öffnen
+Exec=deckcraft %F
+TryExec=deckcraft
+Icon=ai.storyteller.deckcraft
+Categories=Office;Presentation;
+Keywords=powerpoint;pptx;folien;vortrag;deckcraft;
+MimeType=application/x-deckcraft;application/vnd.openxmlformats-officedocument.presentationml.presentation;application/vnd.openxmlformats-officedocument.presentationml.template;application/vnd.openxmlformats-officedocument.presentationml.slideshow;
+StartupNotify=true
