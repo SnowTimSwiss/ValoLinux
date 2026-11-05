@@ -262,3 +262,89 @@ async fn bad_signatures_are_rejected() {
     // unknown device asking for a manifest
     assert_eq!(send(&s, signed(&dev, "GET", "/api/v1/manifest", vec![])).await.0, StatusCode::NOT_FOUND);
 }
+
+fn login_form(user: &str, pw: &str) -> Request<Body> {
+    Request::builder()
+        .method("POST")
+        .uri("/login")
+        .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+        .body(Body::from(format!("username={user}&password={pw}")))
+        .unwrap()
+}
+
+fn hidden_token(html: &str) -> String {
+    let i = html.find("name=\"token\" value=\"").expect("token field") + 20;
+    html[i..i + 64].to_string()
+}
+
+#[tokio::test]
+async fn two_factor_login() {
+    let s = state();
+    let (cookie, csrf) = login(&s).await;
+
+    // wrong code does not enable 2FA
+    let secret = auth::new_totp_secret();
+    send(&s, form("/account/2fa", &cookie, &format!("csrf={csrf}&secret={secret}&code=000000"))).await;
+    assert!(s.db.admin_by_name("admin").unwrap().unwrap().totp_secret.is_none());
+
+    let code = auth::totp(&secret, "admin").unwrap().generate_current().to_string();
+    let (st, _, _) = send(&s, form("/account/2fa", &cookie, &format!("csrf={csrf}&secret={secret}&code={code}"))).await;
+    assert_eq!(st, StatusCode::SEE_OTHER);
+    assert_eq!(s.db.admin_by_name("admin").unwrap().unwrap().totp_secret.as_deref(), Some(secret.as_str()));
+
+    // password alone gives no session, only the 2FA step
+    let (st, h, body) = send(&s, login_form("admin", "correct-horse-1")).await;
+    assert_eq!(st, StatusCode::OK);
+    assert!(!h.iter().any(|(k, _)| k == "set-cookie"));
+    let token = hidden_token(&body);
+
+    // wrong code: rejected, and the token is used up
+    let req = |t: &str, c: &str| {
+        Request::builder()
+            .method("POST")
+            .uri("/login/2fa")
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .body(Body::from(format!("token={t}&code={c}")))
+            .unwrap()
+    };
+    let (_, h, _) = send(&s, req(&token, "123456")).await;
+    assert!(!h.iter().any(|(k, _)| k == "set-cookie"));
+    let (_, h, _) = send(&s, req(&token, &code)).await;
+    assert!(!h.iter().any(|(k, _)| k == "set-cookie"), "token must be single use");
+
+    // fresh password + right code: logged in
+    let (_, _, body) = send(&s, login_form("admin", "correct-horse-1")).await;
+    let code = auth::totp(&secret, "admin").unwrap().generate_current().to_string();
+    let (st, h, _) = send(&s, req(&hidden_token(&body), &code)).await;
+    assert_eq!(st, StatusCode::SEE_OTHER);
+    assert!(h.iter().any(|(k, _)| k == "set-cookie"));
+}
+
+#[tokio::test]
+async fn password_change_and_admins() {
+    let s = state();
+    let (cookie, csrf) = login(&s).await;
+    // second session that must be logged out by the password change
+    let (_, h, _) = send(&s, login_form("admin", "correct-horse-1")).await;
+    let other = h.iter().find(|(k, _)| k == "set-cookie").unwrap().1.split(';').next().unwrap().to_string();
+    assert_eq!(send(&s, get("/", &other)).await.0, StatusCode::OK);
+
+    send(&s, form("/account/password", &cookie, &format!("csrf={csrf}&current=wrong&password=new-password-9&password2=new-password-9"))).await;
+    let a = s.db.admin_by_name("admin").unwrap().unwrap();
+    assert!(auth::verify_password("correct-horse-1", &a.password_hash));
+
+    send(&s, form("/account/password", &cookie, &format!("csrf={csrf}&current=correct-horse-1&password=new-password-9&password2=new-password-9"))).await;
+    let a = s.db.admin_by_name("admin").unwrap().unwrap();
+    assert!(auth::verify_password("new-password-9", &a.password_hash));
+    assert_eq!(send(&s, get("/", &other)).await.0, StatusCode::SEE_OTHER, "other session logged out");
+    assert_eq!(send(&s, get("/", &cookie)).await.0, StatusCode::OK, "own session kept");
+
+    send(&s, form("/account/admins", &cookie, &format!("csrf={csrf}&username=zweit&password=0123456789ab"))).await;
+    assert_eq!(s.db.admins().unwrap().len(), 2);
+    let (st, _, body) = send(&s, get("/account", &cookie)).await;
+    assert_eq!(st, StatusCode::OK);
+    assert!(body.contains("zweit") && body.contains("data:image/png;base64,"));
+    let me = s.db.admin_by_name("admin").unwrap().unwrap().id;
+    send(&s, form(&format!("/account/admins/{me}/delete"), &cookie, &format!("csrf={csrf}"))).await;
+    assert_eq!(s.db.admins().unwrap().len(), 2, "cannot delete yourself");
+}

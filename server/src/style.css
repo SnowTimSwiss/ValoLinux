@@ -49,6 +49,8 @@ code { font-family: "JetBrains Mono", ui-monospace, monospace; }
 .badge { margin-left: auto; background: var(--amber); color: var(--night); border-radius: 99px; padding: 0 8px; font-size: 12px; font-weight: 700; }
 .sidebar-foot { margin-top: auto; padding: 0 8px; font-size: 13px; color: rgba(235,232,255,.6); display: grid; gap: 4px; }
 .sidebar-foot b { color: #fff; }
+.account-link { text-decoration: none; padding: 6px 8px; margin: 0 -8px; border-radius: 8px; }
+.account-link:hover, .account-link.active { background: rgba(235,232,255,.08); }
 .sidebar-foot .link { color: rgba(235,232,255,.85); padding: 0; }
 
 .content { padding: 30px 40px 60px; max-width: 1180px; width: 100%; }
@@ -162,6 +164,9 @@ code.password { display: inline-block; margin-top: 8px; font-size: 20px; letter-
 /* ---------- flash ---------- */
 .flash { padding: 11px 14px; border-radius: 10px; margin-bottom: 16px; font-weight: 500; }
 .flash.ok { background: rgba(46,158,106,.12); color: var(--good); border: 1px solid rgba(46,158,106,.3); }
+.flash.warn { background: rgba(247,160,84,.14); color: #8A4B0E; border: 1px solid rgba(247,160,84,.45); }
+.flash.warn a { font-weight: 700; }
+@media (prefers-color-scheme: dark) { .flash.warn { color: var(--sun); } }
 .flash.err { background: rgba(200,65,79,.10); color: var(--bad); border: 1px solid rgba(200,65,79,.3); }
 
 /* ---------- tiles ---------- */
@@ -222,3 +227,8 @@ body.auth { min-height: 100vh; display: grid; place-items: center; padding: 20px
   .codeform { flex-direction: column; }
 }
 .field .segmented { justify-self: start; }
+
+.qr { background: #fff; padding: 10px; border-radius: 12px; display: inline-block; margin: 6px 0 12px; }
+.qr img { display: block; image-rendering: pixelated; }
+h3.mt { margin: 20px 0 10px; }
+form.inline.two { grid-template-columns: 1fr 1fr auto; }

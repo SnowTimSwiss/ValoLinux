@@ -46,8 +46,11 @@ pub fn session_token(headers: &HeaderMap) -> Option<String> {
 
 /// A logged-in admin. Handlers that take this are only reachable after login.
 pub struct Admin {
+    pub id: i64,
     pub username: String,
     pub csrf: String,
+    pub has_2fa: bool,
+    pub session_token: String,
 }
 
 impl Admin {
@@ -68,10 +71,41 @@ impl FromRequestParts<Shared> for Admin {
         if state.db.admin_count().unwrap_or(0) == 0 {
             return Err(Redirect::to("/setup").into_response());
         }
-        let session = session_token(&parts.headers).and_then(|t| state.db.session(&t).ok().flatten());
-        match session {
-            Some((username, csrf)) => Ok(Admin { username, csrf }),
+        let token = session_token(&parts.headers).unwrap_or_default();
+        let session = state.db.session(&token).ok().flatten();
+        let admin = session.and_then(|(id, csrf)| Some((state.db.admin_by_id(id).ok().flatten()?, csrf)));
+        match admin {
+            Some((a, csrf)) => Ok(Admin {
+                id: a.id,
+                username: a.username,
+                csrf,
+                has_2fa: a.totp_secret.is_some(),
+                session_token: token,
+            }),
             None => Err(Redirect::to("/login").into_response()),
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// TOTP (RFC 6238, SHA1, 6 digits, 30 s) - works with common authenticator apps.
+// ---------------------------------------------------------------------------
+
+pub fn totp(secret_b32: &str, account: &str) -> Option<totp_rs::Totp> {
+    let secret = totp_rs::Secret::try_from_base32(secret_b32).ok()?;
+    totp_rs::Builder::new()
+        .with_secret(secret)
+        .with_account_name(account)
+        .with_issuer(Some("ValoLinux"))
+        .build()
+        .ok()
+}
+
+pub fn new_totp_secret() -> String {
+    totp_rs::Secret::generate().to_base32()
+}
+
+pub fn check_totp(secret_b32: &str, account: &str, code: &str) -> bool {
+    let code: String = code.chars().filter(|c| c.is_ascii_digit()).collect();
+    code.len() == 6 && totp(secret_b32, account).is_some_and(|t| t.check_current(&code).is_some())
 }

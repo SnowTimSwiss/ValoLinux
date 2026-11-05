@@ -22,6 +22,11 @@ CREATE TABLE IF NOT EXISTS sessions (
     csrf TEXT NOT NULL,
     expires INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS pending_logins (
+    token TEXT PRIMARY KEY,
+    admin_id INTEGER NOT NULL REFERENCES admins(id) ON DELETE CASCADE,
+    expires INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS groups (
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL UNIQUE
@@ -103,6 +108,18 @@ impl Device {
 }
 
 #[derive(Debug, Clone)]
+pub struct AdminRow {
+    pub id: i64,
+    pub username: String,
+    pub password_hash: String,
+    pub totp_secret: Option<String>,
+}
+
+fn row_admin(r: &rusqlite::Row) -> Result<AdminRow> {
+    Ok(AdminRow { id: r.get(0)?, username: r.get(1)?, password_hash: r.get(2)?, totp_secret: r.get(3)? })
+}
+
+#[derive(Debug, Clone)]
 pub struct Group {
     pub id: i64,
     pub name: String,
@@ -155,6 +172,13 @@ impl Db {
     fn init(conn: Connection) -> Result<Self> {
         conn.execute_batch("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;")?;
         conn.execute_batch(SCHEMA)?;
+        // migrations for databases created by older versions
+        let has_totp: bool = conn
+            .prepare("SELECT 1 FROM pragma_table_info('admins') WHERE name = 'totp_secret'")?
+            .exists([])?;
+        if !has_totp {
+            conn.execute_batch("ALTER TABLE admins ADD COLUMN totp_secret TEXT")?;
+        }
         for (id, name, fref, desc) in DEFAULT_CATALOG {
             conn.execute(
                 "INSERT OR IGNORE INTO catalog (id, name, flatpak_ref, description) VALUES (?1, ?2, ?3, ?4)",
@@ -183,14 +207,66 @@ impl Db {
         Ok(c.last_insert_rowid())
     }
 
-    pub fn admin_by_name(&self, username: &str) -> Result<Option<(i64, String)>> {
+    pub fn admin_by_name(&self, username: &str) -> Result<Option<AdminRow>> {
         self.c()
             .query_row(
-                "SELECT id, password_hash FROM admins WHERE username = ?1",
+                "SELECT id, username, password_hash, totp_secret FROM admins WHERE username = ?1",
                 [username],
-                |r| Ok((r.get(0)?, r.get(1)?)),
+                row_admin,
             )
             .optional()
+    }
+
+    pub fn admin_by_id(&self, id: i64) -> Result<Option<AdminRow>> {
+        self.c()
+            .query_row("SELECT id, username, password_hash, totp_secret FROM admins WHERE id = ?1", [id], row_admin)
+            .optional()
+    }
+
+    pub fn admins(&self) -> Result<Vec<AdminRow>> {
+        let c = self.c();
+        let mut st = c.prepare("SELECT id, username, password_hash, totp_secret FROM admins ORDER BY lower(username)")?;
+        st.query_map([], row_admin)?.collect()
+    }
+
+    pub fn set_admin_login_password(&self, id: i64, hash: &str) -> Result<()> {
+        let c = self.c();
+        c.execute("UPDATE admins SET password_hash = ?2 WHERE id = ?1", params![id, hash])?;
+        Ok(())
+    }
+
+    pub fn set_admin_totp(&self, id: i64, secret: Option<&str>) -> Result<()> {
+        self.c().execute("UPDATE admins SET totp_secret = ?2 WHERE id = ?1", params![id, secret])?;
+        Ok(())
+    }
+
+    pub fn delete_admin(&self, id: i64) -> Result<()> {
+        self.c().execute("DELETE FROM admins WHERE id = ?1", [id])?;
+        Ok(())
+    }
+
+    pub fn create_pending_login(&self, token: &str, admin_id: i64, expires: i64) -> Result<()> {
+        let c = self.c();
+        c.execute("DELETE FROM pending_logins WHERE expires < ?1", [now_unix()])?;
+        c.execute(
+            "INSERT INTO pending_logins (token, admin_id, expires) VALUES (?1, ?2, ?3)",
+            params![token, admin_id, expires],
+        )?;
+        Ok(())
+    }
+
+    /// Single use: the token is deleted whether or not the 2FA code turns out right.
+    pub fn take_pending_login(&self, token: &str) -> Result<Option<i64>> {
+        let c = self.c();
+        let id: Option<i64> = c
+            .query_row(
+                "SELECT admin_id FROM pending_logins WHERE token = ?1 AND expires > ?2",
+                params![token, now_unix()],
+                |r| r.get(0),
+            )
+            .optional()?;
+        c.execute("DELETE FROM pending_logins WHERE token = ?1", [token])?;
+        Ok(id)
     }
 
     pub fn create_session(&self, token: &str, admin_id: i64, csrf: &str, expires: i64) -> Result<()> {
@@ -203,16 +279,21 @@ impl Db {
         Ok(())
     }
 
-    /// Returns (admin username, csrf token) for a valid session.
-    pub fn session(&self, token: &str) -> Result<Option<(String, String)>> {
+    /// Returns (admin id, csrf token) for a valid session.
+    pub fn session(&self, token: &str) -> Result<Option<(i64, String)>> {
         self.c()
             .query_row(
-                "SELECT a.username, s.csrf FROM sessions s JOIN admins a ON a.id = s.admin_id \
-                 WHERE s.token = ?1 AND s.expires > ?2",
+                "SELECT s.admin_id, s.csrf FROM sessions s WHERE s.token = ?1 AND s.expires > ?2",
                 params![token, now_unix()],
                 |r| Ok((r.get(0)?, r.get(1)?)),
             )
             .optional()
+    }
+
+    /// Log out everywhere (e.g. after a password change), except `keep`.
+    pub fn delete_sessions_of(&self, admin_id: i64, keep: &str) -> Result<()> {
+        self.c().execute("DELETE FROM sessions WHERE admin_id = ?1 AND token != ?2", params![admin_id, keep])?;
+        Ok(())
     }
 
     pub fn delete_session(&self, token: &str) -> Result<()> {

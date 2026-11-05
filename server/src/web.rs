@@ -25,6 +25,13 @@ pub fn routes() -> Router<Shared> {
         .route("/static/logo.svg", get(logo))
         .route("/setup", get(setup_page).post(setup_submit))
         .route("/login", get(login_page).post(login_submit))
+        .route("/login/2fa", post(login_2fa))
+        .route("/account", get(account_page))
+        .route("/account/password", post(account_password))
+        .route("/account/2fa", post(account_2fa_enable))
+        .route("/account/2fa/disable", post(account_2fa_disable))
+        .route("/account/admins", post(admin_create))
+        .route("/account/admins/{id}/delete", post(admin_delete))
         .route("/logout", post(logout))
         .route("/devices", get(devices_page))
         .route("/devices/{id}", get(device_page).post(device_update))
@@ -161,7 +168,7 @@ fn layout(s: &Shared, admin: &Admin, active: &str, title: &str, q: &HashMap<Stri
                         }
                     }
                     div.sidebar-foot {
-                        span.user { "Angemeldet als " b { (admin.username) } }
+                        a.account-link.active[active == "/account"] href="/account" { "Angemeldet als " b { (admin.username) } }
                         form method="post" action="/logout" { (csrf(admin)) button.link type="submit" { "Abmelden" } }
                     }
                 }
@@ -244,20 +251,25 @@ async fn setup_submit(State(s): State<Shared>, body: String) -> Page {
     Ok(([(header::SET_COOKIE, cookie)], Redirect::to("/")).into_response())
 }
 
-async fn login_page(State(s): State<Shared>) -> Response {
+async fn login_page(State(s): State<Shared>, Query(q): Q) -> Response {
     if s.db.admin_count().unwrap_or(0) == 0 {
         return Redirect::to("/setup").into_response();
     }
-    auth_page("Anmelden", "Verwaltung der Schulgeräte", "/login", "Anmelden", None, false)
+    auth_page("Anmelden", "Verwaltung der Schulgeräte", "/login", "Anmelden", q.get("err").map(String::as_str), false)
 }
 
 async fn login_submit(State(s): State<Shared>, body: String) -> Page {
     let f = FormData::parse(&body);
     let user = f.text("username");
     let pw = f.get("password").unwrap_or("");
-    if let Some((id, hash)) = s.db.admin_by_name(&user).map_err(e500)? {
-        if auth::verify_password(pw, &hash) {
-            let cookie = auth::login_cookie(&s, id).map_err(e500)?;
+    if let Some(a) = s.db.admin_by_name(&user).map_err(e500)? {
+        if auth::verify_password(pw, &a.password_hash) {
+            if a.totp_secret.is_some() {
+                let token = util::random_token();
+                s.db.create_pending_login(&token, a.id, valo_proto::now_unix() + 300).map_err(e500)?;
+                return Ok(totp_page(&token, None));
+            }
+            let cookie = auth::login_cookie(&s, a.id).map_err(e500)?;
             return Ok(([(header::SET_COOKIE, cookie)], Redirect::to("/")).into_response());
         }
     } else {
@@ -266,6 +278,43 @@ async fn login_submit(State(s): State<Shared>, body: String) -> Page {
     }
     tracing::warn!("failed login for {user:?}");
     Ok(auth_page("Anmelden", "Verwaltung der Schulgeräte", "/login", "Anmelden", Some("Benutzername oder Passwort falsch."), false))
+}
+
+fn totp_page(token: &str, err: Option<&str>) -> Response {
+    html! {
+        (head("Bestätigen"))
+        body.auth {
+            div.auth-card {
+                img.auth-logo src="/static/logo.svg" alt="";
+                h1 { b { "valo" } "linux" }
+                p.muted { "Gib den 6-stelligen Code aus deiner Authenticator-App ein." }
+                @if let Some(e) = err { div.flash.err { (e) } }
+                form method="post" action="/login/2fa" {
+                    input type="hidden" name="token" value=(token);
+                    label { "Code" input.code name="code" inputmode="numeric" pattern="[0-9 ]{6,7}" maxlength="7"
+                        autocomplete="one-time-code" required autofocus; }
+                    button.primary.wide type="submit" { "Bestätigen" }
+                }
+            }
+        }
+    }
+    .into_response()
+}
+
+async fn login_2fa(State(s): State<Shared>, body: String) -> Page {
+    let f = FormData::parse(&body);
+    // single-use token: a wrong code means starting over with the password
+    let Some(id) = s.db.take_pending_login(&f.text("token")).map_err(e500)? else {
+        return Ok(redirect_err("/login", "Anmeldung abgelaufen, bitte nochmals."));
+    };
+    let a = s.db.admin_by_id(id).map_err(e500)?.ok_or_else(not_found)?;
+    let ok = a.totp_secret.as_deref().is_some_and(|sec| auth::check_totp(sec, &a.username, &f.text("code")));
+    if !ok {
+        tracing::warn!("wrong 2FA code for {:?}", a.username);
+        return Ok(redirect_err("/login", "Code falsch. Bitte nochmals mit Passwort anmelden."));
+    }
+    let cookie = auth::login_cookie(&s, a.id).map_err(e500)?;
+    Ok(([(header::SET_COOKIE, cookie)], Redirect::to("/")).into_response())
 }
 
 async fn logout(State(s): State<Shared>, admin: Admin, headers: HeaderMap, body: String) -> Page {
@@ -312,6 +361,9 @@ async fn dashboard(State(s): State<Shared>, admin: Admin, Query(q): Q) -> Page {
     let errors: Vec<_> = adopted.iter().filter(|d| d.last_ok == Some(false)).collect();
     let teachers = adopted.iter().filter(|d| d.role == "teacher").count();
     let body = html! {
+        @if !admin.has_2fa {
+            div.flash.warn { "Dein Konto hat noch keine Zwei-Faktor-Anmeldung. " a href="/account" { "Jetzt einrichten" } }
+        }
         div.stats {
             a.stat href="/devices" { span.num { (adopted.len()) } span.lbl { "Geräte" } span.sub { (teachers) (if teachers == 1 { " Lehrperson · " } else { " Lehrpersonen · " }) (adopted.len() - teachers) " Schüler/innen" } }
             a.stat href="/devices" { span.num.good { (online) } span.lbl { "Online" } span.sub { "in den letzten 10 Minuten" } }
@@ -944,3 +996,148 @@ mod tests {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// account: password, 2FA, other admins
+// ---------------------------------------------------------------------------
+
+async fn account_page(State(s): State<Shared>, admin: Admin, Query(q): Q) -> Page {
+    let admins = s.db.admins().map_err(e500)?;
+    let setup = if admin.has_2fa {
+        None
+    } else {
+        let secret = auth::new_totp_secret();
+        let totp = auth::totp(&secret, &admin.username).ok_or_else(|| e500("totp"))?;
+        let qr = totp.to_qr_base64().map_err(e500)?;
+        Some((secret, qr))
+    };
+    let body = html! {
+        div.grid2 {
+            section.card {
+                h2 { "Zwei-Faktor-Anmeldung" }
+                @if let Some((secret, qr)) = &setup {
+                    p.muted { "Scanne den QR-Code mit einer Authenticator-App (z. B. Aegis, Google Authenticator, 2FAS) und gib den angezeigten Code ein." }
+                    div.qr { img src={"data:image/png;base64," (qr)} alt="QR-Code" width="200" height="200"; }
+                    details { summary.small { "Code manuell eingeben" } code.small { (secret) } }
+                    form method="post" action="/account/2fa" {
+                        (csrf(&admin))
+                        input type="hidden" name="secret" value=(secret);
+                        label { "Code aus der App" input.code name="code" inputmode="numeric" maxlength="7" required autocomplete="one-time-code"; }
+                        button.primary type="submit" { "Aktivieren" }
+                    }
+                } @else {
+                    p { span.pill.good { span.dot {} "aktiv" } }
+                    p.muted { "Zum Deaktivieren einen aktuellen Code eingeben." }
+                    form method="post" action="/account/2fa/disable" {
+                        (csrf(&admin))
+                        label { "Code aus der App" input.code name="code" inputmode="numeric" maxlength="7" required; }
+                        button type="submit" { "Deaktivieren" }
+                    }
+                }
+            }
+            section.card {
+                h2 { "Passwort ändern" }
+                form method="post" action="/account/password" {
+                    (csrf(&admin))
+                    label { "Aktuelles Passwort" input type="password" name="current" required autocomplete="current-password"; }
+                    label { "Neues Passwort" input type="password" name="password" required minlength="10" autocomplete="new-password"; }
+                    label { "Wiederholen" input type="password" name="password2" required minlength="10" autocomplete="new-password"; }
+                    button.primary type="submit" { "Ändern" }
+                }
+            }
+        }
+        section.card {
+            h2 { "Admins" }
+            table.list {
+                thead { tr { th { "Benutzer" } th { "2FA" } th {} } }
+                tbody {
+                    @for a in &admins {
+                        tr {
+                            td { b { (a.username) } @if a.id == admin.id { span.muted { " (du)" } } }
+                            td { @if a.totp_secret.is_some() { span.pill.good { span.dot {} "aktiv" } } @else { span.pill.wait { span.dot {} "fehlt" } } }
+                            td.right {
+                                @if a.id != admin.id {
+                                    form method="post" action={"/account/admins/" (a.id) "/delete"}
+                                        onsubmit="return confirm('Admin wirklich löschen?')" {
+                                        (csrf(&admin)) button.link.danger-text type="submit" { "Löschen" }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            h3.mt { "Neuen Admin anlegen" }
+            form.inline.two method="post" action="/account/admins" {
+                (csrf(&admin))
+                label { "Benutzername" input name="username" required maxlength="40"; }
+                label { "Startpasswort" input type="password" name="password" required minlength="10" autocomplete="new-password"; }
+                button.primary type="submit" { "Anlegen" }
+            }
+            p.muted.small { "Alle Admins haben die gleichen Rechte. Jeder Admin sollte sofort sein Passwort ändern und 2FA einrichten." }
+        }
+    };
+    Ok(layout(&s, &admin, "/account", "Konto", &q, body))
+}
+
+async fn account_password(State(s): State<Shared>, admin: Admin, body: String) -> Page {
+    let f = FormData::parse(&body);
+    admin.check_csrf(&f)?;
+    let a = s.db.admin_by_id(admin.id).map_err(e500)?.ok_or_else(not_found)?;
+    if !auth::verify_password(f.get("current").unwrap_or(""), &a.password_hash) {
+        return Ok(redirect_err("/account", "Aktuelles Passwort ist falsch."));
+    }
+    let pw = f.get("password").unwrap_or("");
+    if pw.chars().count() < 10 || Some(pw) != f.get("password2") {
+        return Ok(redirect_err("/account", "Neues Passwort zu kurz (mind. 10 Zeichen) oder nicht gleich wiederholt."));
+    }
+    s.db.set_admin_login_password(admin.id, &auth::hash_password(pw)).map_err(e500)?;
+    s.db.delete_sessions_of(admin.id, &admin.session_token).map_err(e500)?;
+    Ok(redirect_msg("/account", "Passwort geändert. Andere Sitzungen wurden abgemeldet."))
+}
+
+async fn account_2fa_enable(State(s): State<Shared>, admin: Admin, body: String) -> Page {
+    let f = FormData::parse(&body);
+    admin.check_csrf(&f)?;
+    let secret = f.text("secret");
+    if !auth::check_totp(&secret, &admin.username, &f.text("code")) {
+        return Ok(redirect_err("/account", "Code stimmt nicht. Uhrzeit auf dem Handy prüfen und neu scannen."));
+    }
+    s.db.set_admin_totp(admin.id, Some(&secret)).map_err(e500)?;
+    Ok(redirect_msg("/account", "Zwei-Faktor-Anmeldung ist aktiv."))
+}
+
+async fn account_2fa_disable(State(s): State<Shared>, admin: Admin, body: String) -> Page {
+    let f = FormData::parse(&body);
+    admin.check_csrf(&f)?;
+    let a = s.db.admin_by_id(admin.id).map_err(e500)?.ok_or_else(not_found)?;
+    let ok = a.totp_secret.as_deref().is_some_and(|sec| auth::check_totp(sec, &a.username, &f.text("code")));
+    if !ok {
+        return Ok(redirect_err("/account", "Code falsch."));
+    }
+    s.db.set_admin_totp(admin.id, None).map_err(e500)?;
+    Ok(redirect_msg("/account", "Zwei-Faktor-Anmeldung deaktiviert."))
+}
+
+async fn admin_create(State(s): State<Shared>, admin: Admin, body: String) -> Page {
+    let f = FormData::parse(&body);
+    admin.check_csrf(&f)?;
+    let user: String = f.text("username").chars().take(40).collect();
+    let pw = f.get("password").unwrap_or("");
+    if user.is_empty() || pw.chars().count() < 10 {
+        return Ok(redirect_err("/account", "Benutzername fehlt oder Passwort kürzer als 10 Zeichen."));
+    }
+    match s.db.create_admin(&user, &auth::hash_password(pw)) {
+        Ok(_) => Ok(redirect_msg("/account", "Admin angelegt.")),
+        Err(_) => Ok(redirect_err("/account", "Diesen Benutzernamen gibt es schon.")),
+    }
+}
+
+async fn admin_delete(State(s): State<Shared>, admin: Admin, Path(id): Path<i64>, body: String) -> Page {
+    admin.check_csrf(&FormData::parse(&body))?;
+    if id == admin.id {
+        return Ok(redirect_err("/account", "Du kannst dich nicht selbst löschen."));
+    }
+    s.db.delete_admin(id).map_err(e500)?;
+    Ok(redirect_msg("/account", "Admin gelöscht."))
+}

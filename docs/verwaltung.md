@@ -63,7 +63,8 @@ Offline: Der Agent wendet beim Start das letzte gültige Manifest aus dem Cache 
 ## Sicherheit (Stand)
 - Admin-Passwörter mit Argon2, Sitzungen serverseitig, CSRF-Token in allen Formularen, Cookies `HttpOnly; SameSite=Strict`.
 - Geräte-Anfragen sind signiert (Zeitfenster 5 Min.), Manifeste sind signiert.
-- **Offen:** 2FA für Admins, HTTPS direkt im Server (bis dahin Reverse-Proxy), Verschlüsselung der gespeicherten Geräte-Admin-Passwörter, Rechteverwaltung für mehrere Admins, iroh-Transport.
+- 2FA (TOTP) für Admins: einrichten unter „Konto“, danach verlangt die Anmeldung Passwort + Code. Falscher Code = Passwort neu eingeben. Passwortwechsel meldet andere Sitzungen ab.
+- **Offen:** 2FA erzwingen (derzeit nur Hinweis), HTTPS direkt im Server (bis dahin Reverse-Proxy), Verschlüsselung der gespeicherten Geräte-Admin-Passwörter, Rechteverwaltung für mehrere Admins, iroh-Transport.
 - Wer den Server kontrolliert, kontrolliert alle Geräte. Web-UI nicht ins Internet stellen.
 
 ## Tests
@@ -78,3 +79,4 @@ Der Server-Test spielt den ganzen Ablauf durch (Setup, Login, Anmeldung, Adoptio
 ![Gerät](img/ui/10-device.png)
 ![Einstellungen Lehrpersonen](img/ui/06-settings-teacher.png)
 ![App-Katalog](img/ui/07-apps.png)
+![Konto mit 2FA](img/ui/14-account.png)
