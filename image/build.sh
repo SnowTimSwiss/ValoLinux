@@ -34,13 +34,31 @@ lb config \
   --image-name valolinux \
   --bootappend-live "boot=live components live-config.username=valo live-config.locales=de_CH.UTF-8 live-config.keyboard-layouts=ch live-config.timezone=Europe/Zurich"
 
-# Boot menu branding (best effort, UNTESTED): copy live-build's bootloader templates and rename the title.
-if [ -d /usr/share/live/build/bootloaders ]; then
-  rm -rf config/bootloaders && cp -r /usr/share/live/build/bootloaders config/bootloaders
-  grep -rIl -E 'Debian GNU/Linux|Debian Live|Debian' config/bootloaders 2>/dev/null \
-    | xargs -r sed -i -e 's/Debian GNU\/Linux/ValoLinux/g' -e 's/Debian Live/ValoLinux/g' -e 's/Debian/ValoLinux/g'
-  find config/bootloaders -name 'splash.png' -exec cp config/includes.chroot/usr/share/backgrounds/valolinux-splash.png {} \;
+# Boot menu branding. live-build (1:20250505) overlays config/bootloaders/* over its
+# templates and renders config/bootloaders/splash.svg with rsvg-convert.
+# Must not fail the build: branding is cosmetic.
+LB_SHARE=/usr/share/live/build/bootloaders
+rm -rf config/bootloaders
+mkdir -p config/bootloaders/syslinux_common config/bootloaders/grub-pc/live-theme
+if [ -f "$LB_SHARE/syslinux_common/menu.cfg" ]; then
+  sed 's/^menu title Boot menu/menu title ValoLinux/' "$LB_SHARE/syslinux_common/menu.cfg" \
+    > config/bootloaders/syslinux_common/menu.cfg || true
 fi
+if [ -f "$LB_SHARE/grub-pc/live-theme/theme.txt" ]; then
+  sed 's/^title-text:.*/title-text: "ValoLinux"/' "$LB_SHARE/grub-pc/live-theme/theme.txt" \
+    > config/bootloaders/grub-pc/live-theme/theme.txt || true
+fi
+SPLASH=config/includes.chroot/usr/share/backgrounds/valolinux-splash.png
+if [ -f "$SPLASH" ]; then
+  {
+    printf '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="640" height="480">'
+    printf '<image width="640" height="480" xlink:href="data:image/png;base64,'
+    base64 -w0 "$SPLASH"
+    printf '"/></svg>\n'
+  } > config/bootloaders/splash.svg
+fi
+find config/bootloaders -type d -empty -delete || true
+
 lb build
 find . -maxdepth 1 -name 'valolinux*.iso' -exec mv {} "$out/" \;
 ls -lh "$out"
