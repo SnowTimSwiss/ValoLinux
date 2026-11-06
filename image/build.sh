@@ -78,5 +78,20 @@ fi
 find config/bootloaders -type d -empty -delete || true
 
 lb build
+
+# Boot sanity check: show the boot config and make sure every kernel/initrd it
+# references exists on the medium (a wrong path gives "invalid magic number /
+# you need to load the kernel first" at boot).
+echo "=== binary/live ==="; ls -l binary/live 2>/dev/null || true
+echo "=== binary/boot/grub/grub.cfg ==="; cat binary/boot/grub/grub.cfg 2>/dev/null || true
+bad=0
+for f in binary/boot/grub/grub.cfg binary/isolinux/*.cfg; do
+  [ -f "$f" ] || continue
+  for p in $(grep -hE '^[[:space:]]*(linux|initrd|kernel|append[[:space:]]+initrd=)' "$f" | grep -oE '/(live|install)[^ ]*' | sort -u); do
+    case "$p" in *@*|*'$'*) echo "ERROR: unresolved placeholder in $f: $p"; bad=1; continue;; esac
+    [ -e "binary$p" ] || { echo "ERROR: $f refers to missing $p"; bad=1; }
+  done
+done
+[ "$bad" = 0 ] || { echo "ERROR: boot config is inconsistent"; exit 1; }
 find . -maxdepth 1 -name 'valolinux*.iso' -exec mv {} "$out/" \;
 ls -lh "$out"
