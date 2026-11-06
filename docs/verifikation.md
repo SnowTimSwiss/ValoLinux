@@ -23,8 +23,8 @@ Ergebnisse hier eintragen (Datum, Methode, Resultat). Bis dahin gilt alles als *
 | Logout-Skript `session-cleanup` (Home löschen) | im Container geprüft 2026-11-05 | löscht nur `/home/valo` bei Modus `wipe`, stellt aus `/etc/skel` wieder her. **Offen:** setzt LightDM beim `session-cleanup-script` wirklich `USER`? Auf echtem Gerät prüfen. |
 | live-build 1:20250505 (trixie): Bootloader-Vorlagen | geprüft am Quellcode 2026-11-05 | Vorlagen enthalten kein „Debian“, Splash ist `splash.svg` (mit `rsvg-convert` gerendert), eigene Dateien in `config/bootloaders/` überlagern die Vorlagen. Titel: `syslinux_common/menu.cfg` (`menu title Boot menu` + Piepton-Zeichen), `grub-pc/live-theme/theme.txt` (`title-text`). Quelle: Spiegel github.com/Kicksecure/live-build. |
 
-## ISO: Kernel hinter dem Squashfs (Boot-Fehler „invalid magic number", 0.0.4)
+## ISO: Boot-Fehler „invalid magic number" mit Ventoy (0.0.4)
 
-- **Gemessen (xorriso 1.5.6, Testbaum mit 2,3-GB-Squashfs):** `xorriso -as mkisofs` legt Dateien in Namensreihenfolge ab, also liegt `/live/vmlinuz-*` hinter `filesystem.squashfs`, hier bei Sektor 1,18 Mio. (> 2 GiB = Sektor 1.048.576). Mit `--sort-weight 100 /live/vmlinuz-…` (nach dem Quellpfad angegeben) liegt der Kernel bei Sektor ~2500.
-- **Nicht bestätigt:** dass dies die Ursache des Fehlers mit Ventoy ist. Dagegen spricht, dass Ventoy auch ~4-GB-ISOs (Zorin) startet und dass der Installer-Kernel (`/install`) früh im Image liegt. `build.sh` setzt die Sortierung trotzdem (Wrapper um `xorriso`) und gibt die Sektoren der Boot-Dateien im Log aus.
-- Offen: Ergebnis des nächsten Testbuilds mit Ventoy (normaler und GRUB2-Modus) und in einer VM.
+- **Gemessen (Testbuild `dev-6`, Log):** Squashfs 1,5 GB (zstd), `/live/vmlinuz` bei Sektor 867.772 (≈ 1,78 GB), `/live/initrd.img` bei 809.694, Installer-Kernel `/install/gtk/vmlinuz` bei 41.192. Alle Boot-Dateien liegen **unter** 2 GiB (Sektor 1.048.576), der Kernel hat gültigen Header (`HdrS`), die `grub.cfg` zeigt auf die richtigen Pfade. Die Theorie „Kernel hinter 2 GiB" ist damit **widerlegt**.
+- Ein Versuch, Kernel/initrd per `--sort-weight` nach vorn zu legen, hat im Build nicht gegriffen und wurde wieder entfernt (lokal mit xorriso 1.5.6 funktionierte `--sort-weight N /iso/pfad` nach dem Quellpfad).
+- Ursache bleibt **offen**. Verbleibende Unterschiede zu 0.0.3: eigene `grub.cfg` (deutsche Texte mit Umlauten/„…"), ISO ≈ 2,2 GB, initrd 118 MB (Firmware).
