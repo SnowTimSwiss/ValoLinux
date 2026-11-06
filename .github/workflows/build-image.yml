@@ -1,4 +1,5 @@
-# Runs only when a GitHub release is published (can be changed later: schedule, manual).
+# Runs when a GitHub release is published, or manually (Actions -> release -> Run workflow).
+# Manual runs build and test but publish nothing: the ISO and agent are workflow artifacts.
 #   1. test:         cargo test for server, agent and shared crate
 #   2. iso:          live ISO (incl. valo-agent) -> attached to the release
 #   3. server-image: Docker image -> ghcr.io/<owner>/valolinux-server:<tag> and :latest
@@ -8,10 +9,24 @@ name: release
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      fast:
+        description: "Fast test build (zstd squashfs: much quicker, ISO bigger)"
+        type: boolean
+        default: true
+      skip_tests:
+        description: "Skip cargo test"
+        type: boolean
+        default: false
 permissions:
   contents: write
+env:
+  # release tag, or dev-<run number> for manual runs
+  TAG: ${{ github.event.release.tag_name || format('dev-{0}', github.run_number) }}
 jobs:
   test:
+    if: ${{ !inputs.skip_tests }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -20,12 +35,14 @@ jobs:
 
   iso:
     needs: test
+    if: ${{ !cancelled() && (needs.test.result == 'success' || needs.test.result == 'skipped') }}
     runs-on: ubuntu-24.04
     container:
       image: debian:trixie
       options: --privileged
     env:
       GH_TOKEN: ${{ github.token }}
+      VALO_FAST: ${{ inputs.fast && '1' || '' }}
     steps:
       - name: Install tools
         run: |
@@ -38,6 +55,12 @@ jobs:
           # Rust: valo-agent (and the FlameWM source fallback)
           curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
       - uses: actions/checkout@v4
+      # live-build keeps downloaded packages in image/cache: reuse them between runs
+      - uses: actions/cache@v4
+        with:
+          path: image/cache
+          key: lb-cache-${{ hashFiles('image/config/package-lists/**') }}
+          restore-keys: lb-cache-
       - name: Build ISO
         run: |
           . "$HOME/.cargo/env"
@@ -46,7 +69,7 @@ jobs:
       - name: Name and checksum
         run: |
           cd out
-          mv valolinux*.iso "valolinux-${{ github.event.release.tag_name }}-amd64.iso"
+          mv valolinux*.iso "valolinux-$TAG-amd64.iso"
           sha256sum valolinux-*.iso > SHA256SUMS
           ls -lh valolinux-*.iso
           echo "ISO size: $(du -h valolinux-*.iso | cut -f1)" >> "$GITHUB_STEP_SUMMARY"
@@ -55,6 +78,7 @@ jobs:
           name: valolinux-iso
           path: out/*
       - name: Attach to release
+        if: ${{ github.event_name == 'release' }}
         # GitHub allows at most 2 GiB per release file: bigger ISOs are split.
         # Reassemble: cat valolinux-*.iso.part-* > valolinux-<tag>-amd64.iso
         run: |
@@ -64,10 +88,11 @@ jobs:
             split -b 1900M -d "$iso" "$iso.part-"
             rm "$iso"
           fi
-          gh release upload "${{ github.event.release.tag_name }}" * --clobber --repo "$GITHUB_REPOSITORY"
+          gh release upload "$TAG" * --clobber --repo "$GITHUB_REPOSITORY"
 
   server-image:
     needs: test
+    if: ${{ github.event_name == 'release' }}
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -87,11 +112,12 @@ jobs:
           file: server/Dockerfile
           push: true
           tags: |
-            ${{ env.IMAGE }}:${{ github.event.release.tag_name }}
+            ${{ env.IMAGE }}:${{ env.TAG }}
             ${{ env.IMAGE }}:latest
 
   agent:
     needs: test
+    if: ${{ !cancelled() && (needs.test.result == 'success' || needs.test.result == 'skipped') }}
     runs-on: ubuntu-24.04
     # built on Debian trixie so the binary matches the image's glibc
     container: debian:trixie
@@ -109,9 +135,14 @@ jobs:
           . "$HOME/.cargo/env"
           cargo build --release --locked -p valo-agent
           mkdir -p out
-          cp target/release/valo-agent "out/valo-agent-${{ github.event.release.tag_name }}-linux-amd64"
+          cp target/release/valo-agent "out/valo-agent-$TAG-linux-amd64"
           cd out && sha256sum valo-agent-* > SHA256SUMS-agent
+      - uses: actions/upload-artifact@v4
+        with:
+          name: valo-agent
+          path: out/*
       - name: Attach to release
+        if: ${{ github.event_name == 'release' }}
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          gh release upload "${{ github.event.release.tag_name }}" out/* --clobber --repo "$GITHUB_REPOSITORY"
+          gh release upload "$TAG" out/* --clobber --repo "$GITHUB_REPOSITORY"

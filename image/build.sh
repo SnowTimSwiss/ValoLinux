@@ -19,8 +19,13 @@ if [ -n "$missing" ]; then echo "ERROR: packages not found in Debian:$missing"; 
 ( cd .. && cargo build --release --locked -p valo-agent )
 install -D -m 0755 ../target/release/valo-agent config/includes.chroot/usr/local/bin/valo-agent
 
+# VALO_FAST=1: quick test build (zstd squashfs is much faster to compress than xz)
+fast=()
+[ -z "${VALO_FAST:-}" ] || fast=(--chroot-squashfs-compression-type zstd)
+
 lb clean --purge || true
 lb config \
+  "${fast[@]}" \
   --distribution trixie \
   --architectures amd64 \
   --archive-areas "main contrib non-free-firmware" \
