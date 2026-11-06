@@ -79,6 +79,12 @@ find config/bootloaders -type d -empty -delete || true
 
 lb build
 
+# Size report: biggest installed packages and the final image parts
+echo "=== largest packages (installed size, KiB) ==="
+dpkg-query --admindir=chroot/var/lib/dpkg -W -f='${Installed-Size}\t${Package}\n' 2>/dev/null | sort -rn | head -40 || true
+ls -lh binary/live/*.squashfs 2>/dev/null || true
+du -sh chroot/opt chroot/usr/lib chroot/usr/share chroot/lib/firmware 2>/dev/null || true
+
 # Boot sanity check: show the boot config and make sure every kernel/initrd it
 # references exists on the medium (a wrong path gives "invalid magic number /
 # you need to load the kernel first" at boot).
