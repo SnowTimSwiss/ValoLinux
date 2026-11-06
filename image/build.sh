@@ -82,7 +82,37 @@ if [ -f "$SPLASH" ]; then
 fi
 find config/bootloaders -type d -empty -delete || true
 
+# Boot files first: live-build's xorriso call lays files out in name order, so the
+# kernel/initrd end up behind the (multi-GB) squashfs, beyond 2 GiB. Some loaders
+# (GRUB via Ventoy, old BIOSes) cannot read that far ("invalid magic number").
+# Wrapper that adds --sort-weight for them; the weights must come after the source path.
+wrapdir="$PWD/.wrapbin"
+mkdir -p "$wrapdir"
+real_xorriso="$(command -v xorriso)"
+cat > "$wrapdir/xorriso" <<WRAP
+#!/bin/sh
+if [ "\$1" = "-as" ] && [ "\$2" = "mkisofs" ]; then
+  extra=""
+  for f in binary/live/vmlinuz-* binary/live/initrd.img-* binary/install/vmlinuz binary/install/initrd.gz binary/install/gtk/vmlinuz binary/install/gtk/initrd.gz; do
+    [ -e "\$f" ] && extra="\$extra --sort-weight 100 /\${f#binary/}"
+  done
+  exec "$real_xorriso" "\$@" \$extra
+fi
+exec "$real_xorriso" "\$@"
+WRAP
+chmod +x "$wrapdir/xorriso"
+export PATH="$wrapdir:$PATH"
+
 lb build
+
+# Where do the boot files sit in the finished ISO? (LBA * 2048 must stay below 2 GiB = LBA 1048576)
+iso_file="$(ls valolinux*.iso | head -1)"
+echo "=== boot file positions in $iso_file (LBA) ==="
+xorriso -indev "$iso_file" -find / -type f \( -name 'vmlinuz*' -o -name 'initrd*' -o -name '*.squashfs' \) -exec report_lba 2>&1 | grep "File data" || true
+for k in binary/live/vmlinuz-*; do
+  # a bzImage has "HdrS" at byte offset 514
+  [ "$(dd if="$k" bs=1 skip=514 count=4 2>/dev/null)" = "HdrS" ] && echo "kernel ok: $k" || { echo "ERROR: $k is not a Linux kernel image"; exit 1; }
+done
 
 # Size report: biggest installed packages and the final image parts
 echo "=== largest packages (installed size, KiB) ==="
