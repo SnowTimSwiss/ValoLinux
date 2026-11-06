@@ -35,3 +35,14 @@ Zum Abhaken beim Test zuhause. Bei Problemen: Foto/Screenshot + was passiert ist
 - [ ] Nach ca. 1 Minute: Gerät in der Web-UI „online“ und „aktuell“? Fehlermeldungen in der Gerätedetailseite notieren.
 - [ ] Einstellung ändern (z. B. Tastatur „Schweiz (Französisch)“, Hintergrundbild), abmelden/anmelden: wirkt es?
 - [ ] „Neu starten“ in der Web-UI: startet das Gerät innert ca. 1 Minute neu? (Live-System: danach wieder neuer Code, weil nichts gespeichert wird.)
+
+## ISO herunterladen (ab 0.0.4)
+
+GitHub erlaubt pro Release-Datei maximal 2 GiB. Ist die ISO grösser, liegt sie als `valolinux-<tag>-amd64.iso.part-00`, `.part-01` … vor. Zusammensetzen und prüfen:
+
+```bash
+cat valolinux-*-amd64.iso.part-* > valolinux-amd64.iso
+sha256sum valolinux-amd64.iso   # mit SHA256SUMS vergleichen
+```
+
+Die vollständige ISO hängt zusätzlich als Artefakt am Workflow-Lauf.

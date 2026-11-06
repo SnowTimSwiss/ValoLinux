@@ -53,7 +53,16 @@ jobs:
           name: valolinux-iso
           path: out/*
       - name: Attach to release
-        run: gh release upload "${{ github.event.release.tag_name }}" out/* --clobber --repo "$GITHUB_REPOSITORY"
+        # GitHub allows at most 2 GiB per release file: bigger ISOs are split.
+        # Reassemble: cat valolinux-*.iso.part-* > valolinux-<tag>-amd64.iso
+        run: |
+          cd out
+          iso=$(ls valolinux-*.iso)
+          if [ "$(stat -c %s "$iso")" -ge 2000000000 ]; then
+            split -b 1900M -d "$iso" "$iso.part-"
+            rm "$iso"
+          fi
+          gh release upload "${{ github.event.release.tag_name }}" * --clobber --repo "$GITHUB_REPOSITORY"
 
   server-image:
     needs: test
